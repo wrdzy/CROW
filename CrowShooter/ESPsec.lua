@@ -136,6 +136,13 @@ local ShowTool = secesp:AddToggle({
     flag = "ShowTool"
 })
 
+local ESPTeamCheck = secesp:AddToggle({
+    text = "Team check",
+    state = true,
+    tooltip = "Hide ESP for teammates (only show enemies)",
+    flag = "ESPTeamCheck"
+})
+
 local EnemyList = _G.CROW_EnemyList or {}
 _G.CROW_EnemyList = EnemyList
 
@@ -698,8 +705,8 @@ RunService.RenderStepped:Connect(function(delta)
             continue
         end
 
-        -- Team check: only show ESP for enemies (not teammates)
-        if isTeammate(player) then
+        -- Team check: only show ESP for enemies when toggle is on
+        if flags["ESPTeamCheck"] and isTeammate(player) then
             setESPDataVisible(data, false)
             continue
         end
