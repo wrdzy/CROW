@@ -635,8 +635,8 @@ end
 
 -- Fly: camera-based movement; when idle use deltaTime to stay exactly stationary (no drift)
 local flyValue = Config.defaultFlySpeed or 50
-local flyUpKey = Enum.KeyCode.Space
-local flyDownKey = Enum.KeyCode.LeftControl
+local flyUpKey = nil   -- no default; user sets in UI (NONE = no key)
+local flyDownKey = nil
 local flyLastTick = 0
 toggleFly = function(state)
     states.flyEnabled = state
@@ -658,8 +658,8 @@ toggleFly = function(state)
         local s = UserInputService:IsKeyDown(Enum.KeyCode.S) and 1 or 0
         local a = UserInputService:IsKeyDown(Enum.KeyCode.A) and 1 or 0
         local d = UserInputService:IsKeyDown(Enum.KeyCode.D) and 1 or 0
-        local up = UserInputService:IsKeyDown(flyUpKey) and 1 or 0
-        local down = UserInputService:IsKeyDown(flyDownKey) and 1 or 0
+        local up = (flyUpKey and UserInputService:IsKeyDown(flyUpKey)) and 1 or 0
+        local down = (flyDownKey and UserInputService:IsKeyDown(flyDownKey)) and 1 or 0
         local forward = (w - s) * look
         local strafe = (d - a) * right
         local horizontal = forward + strafe
@@ -866,9 +866,9 @@ secplayer:AddBind({
     text = "Fly Up Key",
     tooltip = "Hold to move up while flying",
     flag = "FlyUpKey",
-    bind = Enum.KeyCode.Space,
+    bind = "NONE",
     keycallback = function(key)
-        flyUpKey = (key and key ~= "none") and key or Enum.KeyCode.Space
+        flyUpKey = (key and key ~= "none" and key ~= "NONE") and key or nil
     end
 })
 
@@ -876,9 +876,9 @@ secplayer:AddBind({
     text = "Fly Down Key",
     tooltip = "Hold to move down while flying",
     flag = "FlyDownKey",
-    bind = Enum.KeyCode.LeftControl,
+    bind = "NONE",
     keycallback = function(key)
-        flyDownKey = (key and key ~= "none") and key or Enum.KeyCode.LeftControl
+        flyDownKey = (key and key ~= "none" and key ~= "NONE") and key or nil
     end
 })
 
