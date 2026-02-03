@@ -79,6 +79,14 @@ ShowESP:AddBind({
     end
 })
 
+-- Team check: hide ESP for teammates (only show enemies); right under Enable ESP
+secesp:AddToggle({
+    text    = "Team check",
+    state   = false,
+    flag    = "ESPTeamCheck",
+    tooltip = "Hide ESP for teammates (only show enemies)",
+})
+
 -- ESP Features Toggles
 local ESPBox = secesp:AddToggle({
     text = "Show Box",
@@ -134,14 +142,6 @@ local ShowTool = secesp:AddToggle({
     state = false,
     tooltip = "Show equipped tool name below distance text",
     flag = "ShowTool"
-})
-
--- Team check: hide ESP for teammates (only show enemies); same pattern as AimSec Team Check
-secesp:AddToggle({
-    text    = "Team check",
-    state   = true,
-    flag    = "ESPTeamCheck",
-    tooltip = "Hide ESP for teammates (only show enemies)",
 })
 
 local EnemyList = _G.CROW_EnemyList or {}
