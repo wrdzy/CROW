@@ -1151,10 +1151,11 @@ SilentAimSection:AddList({
 SilentAimSection:AddList({
     text = "Silent Aim Method",
     selected = "All Methods",
-    tooltip = "Which ray method to use. All Methods tries all; Namecall (Universal) uses one hook for any Ray API.",
+    tooltip = "Which ray method to use. Mouse.Hit/Target for games that read Mouse.Target or Mouse.Hit.",
     values = {
         "All Methods",
         "Namecall (Universal)",
+        "Mouse.Hit/Target",
         "ScreenPointToRay",
         "ViewportPointToRay",
         "Raycast",
@@ -1348,6 +1349,51 @@ local function applyGetMouseLocationHooks()
     end)
 end
 
+-- Mouse.Hit/Target hook: when game reads Mouse.Target or Mouse.Hit, return silent aim target (logic from Universal Silent Aim - Averiias/Stefanuk12)
+local mouseHitTargetHookApplied = false
+local oldMouseIndex = nil
+local function applyMouseHitTargetHook()
+    if mouseHitTargetHookApplied then return end
+    if not Mouse or not getrawmetatable or not hookmetamethod or not checkcaller then return end
+    mouseHitTargetHookApplied = true
+    pcall(function()
+        local mt = getrawmetatable(Mouse)
+        if not mt or type(mt) ~= "table" then return end
+        oldMouseIndex = mt.__index
+        if type(oldMouseIndex) ~= "function" and type(oldMouseIndex) ~= "table" then return end
+        local function indexHook(self, Index)
+            if checkcaller and checkcaller() then
+                if type(oldMouseIndex) == "function" then return oldMouseIndex(self, Index) end
+                if type(oldMouseIndex) == "table" and oldMouseIndex[Index] ~= nil then return oldMouseIndex[Index] end
+                return nil
+            end
+            local flags = library and library.flags
+            if flags and flags["SilentAimEnabled"] and (flags["SilentAimActive"] ~= false) and (flags["SilentMethod"] == "Mouse.Hit/Target" or flags["SilentMethod"] == "All Methods") then
+                if CalculateChance(flags["SilentHitChance"] or 100) then
+                    local HitPart = getClosestPlayer()
+                    if HitPart then
+                        if Index == "Target" or Index == "target" then
+                            return HitPart
+                        elseif Index == "Hit" or Index == "hit" then
+                            local usePred = (flags["SilentPredictionMode"] == "Manual") and (flags["SilentManualPrediction"] or 0.165)
+                            if usePred and usePred > 0 and HitPart.Velocity then
+                                return (HitPart.CFrame + (HitPart.Velocity * usePred))
+                            end
+                            return HitPart.CFrame
+                        end
+                    end
+                end
+            end
+            if type(oldMouseIndex) == "function" then return oldMouseIndex(self, Index) end
+            if type(oldMouseIndex) == "table" and oldMouseIndex[Index] ~= nil then return oldMouseIndex[Index] end
+            return nil
+        end
+        if setreadonly then pcall(function() setreadonly(mt, false) end) end
+        mt.__index = newcclosure and newcclosure(indexHook) or indexHook
+        if setreadonly then pcall(function() setreadonly(mt, true) end) end
+    end)
+end
+
 -- __namecall hook: intercept Instance method calls (workspace:Raycast, Camera:ScreenPointToRay, etc.) so silent aim works when games call these via :
 local namecallHooksApplied = false
 local function applyNamecallHooks()
@@ -1478,6 +1524,7 @@ end
 -- Single entry point: apply all silent aim hooks when user enables (no hooks at load = no detection)
 local function applyAllSilentAimHooks()
     pcall(applyGetMouseLocationHooks)
+    pcall(applyMouseHitTargetHook)
     pcall(applyWorkspaceHooks)
     pcall(applyCameraHooks)
     pcall(applyNamecallHooks)
