@@ -129,7 +129,6 @@ storeOriginalSettings()
 -- Flags that affect the game world; when loading a config we update UI only (nocallback) so the game is not auto-applied
 _G.WorldConfigFlags = {
     FullBright = true, NoShadows = true, NoFog = true,
-    AspectRatioStretch = true,
     WorldBrightness = true, WorldExposure = true,
     ColorCorrectionEnabled = true, CCBrightness = true, CCContrast = true, CCSaturation = true, CCTintColor = true,
     AmbientColor = true, FogColor = true, OutdoorAmbientColor = true,
@@ -665,28 +664,6 @@ VisualSection:AddSlider({
 
 
 
-UtilitySection:AddSeparator({ text = "View" })
-
-UtilitySection:AddSlider({
-    enabled = true,
-    text = "Aspect Ratio (Stretch)",
-    tooltip = "Horizontal view stretch. 1 = normal, >1 = wider (performance-neutral)",
-    flag = "AspectRatioStretch",
-    suffix = "x",
-    min = 1,
-    max = 2,
-    increment = 0.05,
-    default = 1,
-    risky = false,
-    callback = function(value)
-        if value > 1 then
-            applyHorizontalStretch(value)
-        else
-            disableHorizontalStretch()
-        end
-    end
-})
-
 UtilitySection:AddSeparator({ text = "Restore & Remove" })
 
 -- Restore and Remove first so they're easy to find
@@ -711,11 +688,6 @@ UtilitySection:AddButton({
         end
         if _G.World.Bloom then
             _G.World.Bloom.Enabled = false
-        end
-        disableHorizontalStretch()
-        local lib = _G.library or _G.CROW
-        if lib and lib.options and lib.options.AspectRatioStretch and lib.options.AspectRatioStretch.SetValue then
-            pcall(function() lib.options.AspectRatioStretch:SetValue(1, true) end)
         end
         syncWorldUIFromLighting()
         _G.CROW:SendNotification("Original settings restored", 3)
@@ -757,7 +729,7 @@ UtilitySection:AddSeparator({ text = "Performance" })
 UtilitySection:AddButton({
     enabled = true,
     text = "Potato Mode",
-    tooltip = "Apply maximum performance: disable all post-effects, shadows, fog, particles",
+    tooltip = "Max performance: remove textures/decals, disable particles, full bright, no shadows/fog",
     callback = function()
         -- Lighting: full bright, no shadows, no fog
         Lighting.Brightness = 2
@@ -777,9 +749,11 @@ UtilitySection:AddButton({
         if _G.World.DepthOfField then _G.World.DepthOfField.Enabled = false end
         if _G.World.SunRays then _G.World.SunRays.Enabled = false end
         if _G.World.ColorCorrection then _G.World.ColorCorrection.Enabled = false end
-        -- Disable all ParticleEmitters in workspace (big FPS gain)
+        -- Remove all Decals and Textures in workspace (genuinely remove textures)
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("ParticleEmitter") then
+            if obj:IsA("Decal") or obj:IsA("Texture") then
+                pcall(function() obj:Destroy() end)
+            elseif obj:IsA("ParticleEmitter") then
                 obj.Enabled = false
             elseif obj:IsA("Beam") then
                 obj.Enabled = false
@@ -787,15 +761,14 @@ UtilitySection:AddButton({
                 obj.Enabled = false
             end
         end
-        -- Disable Decals in workspace (optional; can help on huge maps)
+        -- Lowest quality level
         pcall(function()
-            local QualityLevel = settings().Rendering and settings().Rendering.QualityLevel
-            if QualityLevel and type(QualityLevel) == "number" then
+            if settings().Rendering and settings().Rendering.QualityLevel then
                 settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
             end
         end)
         syncWorldUIFromLighting()
-        _G.CROW:SendNotification("Potato Mode applied", 3)
+        _G.CROW:SendNotification("Potato Mode applied (decals/textures removed)", 3)
     end
 })
 

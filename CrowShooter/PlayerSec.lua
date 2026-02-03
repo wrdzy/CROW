@@ -897,7 +897,7 @@ toggleInfiniteJump = function(state)
     trackConnection(conn, "infinite_jump")
 end
 
--- Spinbot: rotate character around Y axis (degrees per second)
+-- Spinbot: rotate character around Y axis (degrees per second). Use RenderStepped so it runs after movement (works in first person / while walking).
 local spinbotSpeed = 360
 local spinbotLastTick = 0
 toggleSpinbot = function(state)
@@ -905,7 +905,7 @@ toggleSpinbot = function(state)
     cleanupConnections("spinbot")
     if not state then return end
     spinbotLastTick = tick()
-    local conn = RunService.Heartbeat:Connect(function()
+    local conn = RunService.RenderStepped:Connect(function()
         if not states.spinbotEnabled or not character then return end
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if not rootPart then return end
@@ -1012,11 +1012,11 @@ local spinbotToggle = secplayer:AddToggle({
 })
 secplayer:AddSlider({
     text = "Spinbot Speed",
-    tooltip = "Degrees per second",
+    tooltip = "Degrees per second (works in first person / while walking)",
     flag = "SpinbotSpeed",
-    min = 90,
-    max = 720,
-    increment = 30,
+    min = 180,
+    max = 3600,
+    increment = 60,
     default = 360,
     callback = function(v)
         spinbotSpeed = v
