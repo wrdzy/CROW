@@ -26,10 +26,8 @@ local seccustomesp = _G.ESPTab:AddSection("Customise ESP", 2)
 
 -- Store references to all UI elements and ESP objects
 local ESPObjects = {}
-local WorldESPObjects = {} -- [instance] = { Box, Name, Distance }
 
--- Tunable constants (optimized for high player counts)
-local ESP_UPDATE_INTERVAL = 1/30
+-- Tunable constants
 local VISIBILITY_CACHE_INTERVAL = 0.2
 local ESP_SETTINGS_SYNC_INTERVAL = 3
 
@@ -138,29 +136,6 @@ local ShowTool = secesp:AddToggle({
     flag = "ShowTool"
 })
 
-secesp:AddSeparator({ text = "World" })
-
-local ShowIngredients = secesp:AddToggle({
-    text = "Show Ingredients",
-    state = false,
-    tooltip = "ESP for parts in workspace.Ingredients",
-    flag = "ShowIngredients"
-})
-
-local ShowNPCs = secesp:AddToggle({
-    text = "Show NPCs",
-    state = false,
-    tooltip = "ESP for models in workspace.NPCs",
-    flag = "ShowNPCs"
-})
-
-local ShowMobs = secesp:AddToggle({
-    text = "Show Mobs (Live)",
-    state = false,
-    tooltip = "ESP for mobs in workspace.Live (names cleaned: no leading ., no trailing numbers)",
-    flag = "ShowMobs"
-})
-
 local EnemyList = _G.CROW_EnemyList or {}
 _G.CROW_EnemyList = EnemyList
 
@@ -224,11 +199,20 @@ secesp:AddButton({
     end
 })
 
--- IsEnemy: enemy list only (no teams). Used by ESP and AimSec.
+-- IsEnemy: enemy list only (no teams). Used by AimSec.
 local function isEnemy(player)
     return player and player ~= LocalPlayer and EnemyList[player] == true
 end
 _G.CROW_IsEnemy = isEnemy
+
+-- Team check: true if player is on the same team as LocalPlayer (hide ESP for teammates).
+local function isTeammate(player)
+    if not player or player == LocalPlayer then return true end
+    local myTeam = LocalPlayer.Team
+    local theirTeam = player.Team
+    if not myTeam or not theirTeam then return false end
+    return myTeam == theirTeam
+end
 
 seccustomesp:AddSeparator({
     text = "Colors"
@@ -608,104 +592,6 @@ local function removeESP(player)
     HealthBarStates[player] = nil
 end
 
--- Clean Live mob name: strip leading ".", strip trailing digits (e.g. ".carbuncle2" -> "carbuncle")
-local function cleanLiveMobName(name)
-    if not name or type(name) ~= "string" then return "?" end
-    local s = name:gsub("^%.", ""):gsub("%d+$", "")
-    return s ~= "" and s or name
-end
-
--- Get world position from a Part, Model, or container (e.g. Folder with parts)
-local function getWorldPosition(inst)
-    if inst:IsA("BasePart") then
-        return inst.Position
-    end
-    if inst:IsA("Model") then
-        local pp = inst.PrimaryPart
-        if pp then return pp.Position end
-        local ok, pos = pcall(function() return inst:GetPivot().Position end)
-        if ok and pos then return pos end
-        local first = inst:FindFirstChildWhichIsA("BasePart")
-        if first then return first.Position end
-    end
-    local first = inst:FindFirstChildWhichIsA("BasePart", true)
-    if first then return first.Position end
-    return nil
-end
-
--- Create simple ESP for a world object (ingredient part, NPC model, or Live mob)
-local function createWorldESP(instance, displayName)
-    if WorldESPObjects[instance] or not instance then return end
-    local success, data = pcall(function()
-        return {
-            Box = Drawing.new("Square"),
-            Name = Drawing.new("Text"),
-            Distance = Drawing.new("Text")
-        }
-    end)
-    if not success then return end
-    data.Box.Thickness = ESPSettings.BoxThickness
-    data.Box.Filled = false
-    data.Box.Visible = false
-    data.Name.Size = ESPSettings.TextSize
-    data.Name.Center = true
-    data.Name.Outline = true
-    data.Name.OutlineColor = Color3.new(0, 0, 0)
-    data.Name.Font = Drawing.Fonts.UI
-    data.Name.Visible = false
-    data.Name.Text = displayName or instance.Name
-    data.Distance.Size = ESPSettings.TextSize
-    data.Distance.Center = true
-    data.Distance.Outline = true
-    data.Distance.OutlineColor = Color3.new(0, 0, 0)
-    data.Distance.Font = Drawing.Fonts.UI
-    data.Distance.Visible = false
-    WorldESPObjects[instance] = data
-end
-
-local function removeWorldESP(instance)
-    local data = WorldESPObjects[instance]
-    if not data then return end
-    for _, obj in pairs(data) do
-        if obj and obj.Remove then obj:Remove() end
-    end
-    WorldESPObjects[instance] = nil
-end
-
--- Collect current world objects: Ingredients (parts), NPCs (models), Live (mobs with cleaned names)
-local function getWorldObjects()
-    local list = {}
-    local ingredients = workspace:FindFirstChild("Ingredients")
-    if ingredients then
-        for _, child in ipairs(ingredients:GetChildren()) do
-            if child:IsA("BasePart") then
-                local pos = getWorldPosition(child)
-                if pos then list[#list + 1] = { instance = child, position = pos, displayName = child.Name, category = "ingredients" } end
-            end
-        end
-    end
-    local npcs = workspace:FindFirstChild("NPCs")
-    if npcs then
-        for _, child in ipairs(npcs:GetChildren()) do
-            if child:IsA("Model") then
-                local pos = getWorldPosition(child)
-                if pos then list[#list + 1] = { instance = child, position = pos, displayName = child.Name, category = "npcs" } end
-            end
-        end
-    end
-    local live = workspace:FindFirstChild("Live")
-    if live then
-        for _, child in ipairs(live:GetChildren()) do
-            local pos = getWorldPosition(child)
-            if pos then
-                local displayName = cleanLiveMobName(child.Name)
-                list[#list + 1] = { instance = child, position = pos, displayName = displayName, category = "mobs" }
-            end
-        end
-    end
-    return list
-end
-
 -- Check if player is visible
 local function isPlayerVisible(character)
     if not LocalPlayer.Character or not character then
@@ -739,11 +625,6 @@ local function updateAllESPSettings()
             line.Thickness = ESPSettings.SkeletonThickness
         end
     end
-    for _, data in pairs(WorldESPObjects) do
-        if data.Box then data.Box.Thickness = ESPSettings.BoxThickness end
-        if data.Name then data.Name.Size = ESPSettings.TextSize end
-        if data.Distance then data.Distance.Size = ESPSettings.TextSize end
-    end
 end
 
 -- Create ESP for existing players
@@ -772,7 +653,6 @@ local function setESPDataVisible(data, visible)
 end
 
 local lastESPShow = false
-local espUpdateAccum = 0
 local visibilityCache = {}
 local visibilityCacheTime = 0
 
@@ -782,16 +662,11 @@ RunService.RenderStepped:Connect(function(delta)
     if not lib.flags["ShowESP"] then
         if lastESPShow then
             for _, data in pairs(ESPObjects) do setESPDataVisible(data, false) end
-            for _, data in pairs(WorldESPObjects) do setESPDataVisible(data, false) end
             lastESPShow = false
         end
         return
     end
     lastESPShow = true
-
-    espUpdateAccum = espUpdateAccum + delta
-    if espUpdateAccum < ESP_UPDATE_INTERVAL then return end
-    espUpdateAccum = 0
 
     local flags = lib.flags
     local now = tick()
@@ -819,6 +694,12 @@ RunService.RenderStepped:Connect(function(delta)
         local humanoid = character and character:FindFirstChild("Humanoid")
 
         if not (player:IsA("Player") and character and hrp and humanoid and humanoid.Health > 0) then
+            setESPDataVisible(data, false)
+            continue
+        end
+
+        -- Team check: only show ESP for enemies (not teammates)
+        if isTeammate(player) then
             setESPDataVisible(data, false)
             continue
         end
@@ -1023,53 +904,6 @@ RunService.RenderStepped:Connect(function(delta)
             data.Tracer.Visible = onScreen
         elseif data.Tracer then
             data.Tracer.Visible = false
-        end
-    end
-
-    -- World ESP: Ingredients, NPCs, Live mobs
-    local worldList = getWorldObjects()
-    local worldCurrentSet = {}
-    for _, w in ipairs(worldList) do worldCurrentSet[w.instance] = true end
-    for inst in pairs(WorldESPObjects) do
-        if not worldCurrentSet[inst] then removeWorldESP(inst) end
-    end
-    local worldColor = ESPSettings.AllyColor
-    local textColor = ESPSettings.TextColor
-    for _, w in ipairs(worldList) do
-        local show = (w.category == "ingredients" and flags["ShowIngredients"]) or (w.category == "npcs" and flags["ShowNPCs"]) or (w.category == "mobs" and flags["ShowMobs"])
-        if not show then
-            local data = WorldESPObjects[w.instance]
-            if data then setESPDataVisible(data, false) end
-        else
-            local distance = (Camera.CFrame.Position - w.position).Magnitude
-            local maxDist = ESPSettings.MaxDistance or 0
-            if maxDist > 0 and distance > maxDist then
-                local data = WorldESPObjects[w.instance]
-                if data then setESPDataVisible(data, false) end
-            else
-                if not WorldESPObjects[w.instance] then createWorldESP(w.instance, w.displayName) end
-                local data = WorldESPObjects[w.instance]
-                if not data then continue end
-                local pos, onScreen = Camera:WorldToViewportPoint(w.position)
-                local scale = math.clamp(1 / (distance / 50), 0.5, 2) * ESPSettings.ESPScale
-                local boxW, boxH = 50 * scale, 50 * scale
-                local boxX, boxY = pos.X - boxW / 2, pos.Y - boxH / 2
-                data.Box.Position = Vector2.new(boxX, boxY)
-                data.Box.Size = Vector2.new(boxW, boxH)
-                data.Box.Color = worldColor
-                data.Box.Thickness = ESPSettings.BoxThickness
-                data.Box.Visible = onScreen
-                data.Name.Text = w.displayName
-                data.Name.Position = Vector2.new(pos.X, boxY - ESPSettings.NameTextOffset)
-                data.Name.Color = textColor
-                data.Name.Size = ESPSettings.TextSize
-                data.Name.Visible = onScreen
-                data.Distance.Text = "[" .. math.floor(distance) .. "]"
-                data.Distance.Position = Vector2.new(pos.X, boxY + boxH + ESPSettings.DistanceTextOffset)
-                data.Distance.Color = textColor
-                data.Distance.Size = ESPSettings.TextSize
-                data.Distance.Visible = onScreen
-            end
         end
     end
 end)
