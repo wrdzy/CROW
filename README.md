@@ -1,6 +1,17 @@
 # CROW
 
-One repo, three projects:
+One repo, three projects.
+
+**Config folder layout (executor data):** There is always one top-level folder `CROW`. Inside it, each variant uses its own config subfolder, so configs don’t mix:
+
+| Variant       | Config path (inside `CROW/`)   |
+|---------------|--------------------------------|
+| Crow Shooter  | `CROW_Shooter_Configs/`        |
+| Crow Deepwoken| `CROW_Deepwoken_Configs/`      |
+
+Example: `CROW/CROW_Shooter_Configs/Main.txt`, `CROW/CROW_Deepwoken_Configs/MyConfig.txt`. Other data (e.g. `assets/`) also lives under `CROW/` as needed.
+
+---
 
 | Folder | Name | Description |
 |--------|------|-------------|

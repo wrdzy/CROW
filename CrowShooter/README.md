@@ -140,4 +140,4 @@ Open/close: **Insert** (or use the "Open / Close" keybind in the Main tab). Edit
 | `signal.lua` | Signal library (loaded by UiInnit). |
 | `docs/EXECUTOR_FUNCTIONS.md` | Executor API reference for developers. |
 
-Configs are stored under the executor’s data folder (e.g. `CROW/GameConfigs/`).
+Configs are stored under the executor’s data folder (e.g. `CROW/CROW_Shooter_Configs/`).

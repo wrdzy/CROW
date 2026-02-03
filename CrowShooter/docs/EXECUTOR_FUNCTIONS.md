@@ -22,7 +22,7 @@ Use this as a reference when writing scripts that run in executors. Availability
 | `delfile(path)` | Deletes a file. |
 | `delfolder(path)` | Deletes a folder. |
 
-Paths are often relative to the executor's data folder (e.g. `CROW/configs/`).
+Paths are often relative to the executor's data folder (e.g. `CROW/CROW_Shooter_Configs/`).
 
 ---
 

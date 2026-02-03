@@ -90,7 +90,7 @@ local library = {
     opening = false;
     hasInit = false;
     cheatname = startupArgs.cheatname or 'CROW';
-    configname = startupArgs.configname or 'GameConfigs';
+    configname = startupArgs.configname or 'CROW_Shooter_Configs';
     fileext = startupArgs.fileext or '.txt';
 }
 do
