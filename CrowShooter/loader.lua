@@ -40,6 +40,22 @@ pcall(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
 end)
 
+-- Loading indicator: show "Loading CROW..." until all scripts are done (removed at end)
+local loadingDraw = nil
+pcall(function()
+    loadingDraw = Drawing.new("Text")
+    loadingDraw.Visible = true
+    loadingDraw.Center = true
+    loadingDraw.Outline = true
+    loadingDraw.Size = 24
+    loadingDraw.Text = "Loading CROW..."
+    loadingDraw.Color = Color3.fromRGB(255, 255, 255)
+    local cam = game:GetService("Workspace") and game.Workspace.CurrentCamera
+    if cam and cam.ViewportSize then
+        loadingDraw.Position = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2 - 40)
+    end
+end)
+
 -- Re-execution: unload existing UI then clear shared refs so new run gets fresh tabs.
 local existingLib = shared.CROW or shared.library
 if existingLib and type(existingLib.Unload) == "function" then
@@ -144,9 +160,11 @@ local function loadScript(name)
         warn("[CROW Loader] Failed to compile " .. name .. ".lua: " .. tostring(err))
         return nil
     end
-    if setfenv then
-        setfenv(fn, shared)
-    end
+    pcall(function()
+        if setfenv and type(setfenv) == "function" then
+            setfenv(fn, shared)
+        end
+    end)
     local ret = fn()
     debugLog("  " .. name .. ".lua finished OK")
     return ret
@@ -160,19 +178,44 @@ for i, entry in ipairs(scriptsToLoad) do
         if DEBUG and type(result) == "string" then
             warn("[CROW Debug] Full error: " .. result)
         end
-        -- If UiInnit failed, later scripts will miss CROW/tabs; log what globals we have
         if entry.name == "UiInnit" then
             debugLog("UiInnit failed - CROW/AdminTab/etc. may be nil. shared.CROW = " .. tostring(shared.CROW))
+        end
+        -- Still remove loading indicator and try to notify on any failure
+        pcall(function()
+            if loadingDraw then
+                if loadingDraw.Remove then loadingDraw:Remove() else loadingDraw.Visible = false end
+                loadingDraw = nil
+            end
+        end)
+        local lib = shared.CROW or shared.library
+        if lib and type(lib.SendNotification) == "function" then
+            pcall(lib.SendNotification, lib, "CROW load failed: " .. entry.name, 5, Color3.fromRGB(255, 100, 100))
         end
     else
         if entry.captureReturn and result and entry.globalName then
             shared[entry.globalName] = result
             debugLog("  Set shared." .. entry.globalName)
         end
+        -- Show "Loading CROW..." in UI as soon as library exists (after UiInnit)
+        if entry.name == "UiInnit" then
+            pcall(function()
+                local lib = shared.CROW or shared.library
+                if lib and type(lib.SendNotification) == "function" then
+                    lib:SendNotification("Loading CROW...", 30, Color3.fromRGB(255, 255, 255))
+                end
+            end)
+        end
     end
 end
 
--- Notify when all tabs are loaded; mention Player tab if character not spawned yet
+-- Remove loading indicator and notify when done
+pcall(function()
+    if loadingDraw then
+        if loadingDraw.Remove then loadingDraw:Remove() else loadingDraw.Visible = false end
+        loadingDraw = nil
+    end
+end)
 pcall(function()
     local lib = shared.CROW or shared.library
     if lib and type(lib.SendNotification) == "function" then

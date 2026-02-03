@@ -1,7 +1,11 @@
 local startupArgs = ({...})[1] or {}
 
-if getgenv().library ~= nil then
-    getgenv().library:Unload();
+do
+    local g = (type(getgenv) == "function" and getgenv) or function() return _G end
+    local ok, env = pcall(g)
+    if ok and env and env.library and type(env.library.Unload) == "function" then
+        pcall(function() env.library:Unload() end)
+    end
 end
 
 if not game:IsLoaded() then
