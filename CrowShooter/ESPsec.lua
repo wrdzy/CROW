@@ -79,13 +79,13 @@ ShowESP:AddBind({
     end
 })
 
--- Team check: hide ESP for teammates; must be second in section (order=2 = right under Enable ESP)
+-- Team check: right under Enable ESP (Separator=1, Enable ESP=2, so this must be 3)
 secesp:AddToggle({
     text    = "Team check",
     state   = false,
     flag    = "ESPTeamCheck",
     tooltip = "Hide ESP for teammates (only show enemies)",
-    order   = 2,
+    order   = 3,
 })
 
 -- ESP Features Toggles
