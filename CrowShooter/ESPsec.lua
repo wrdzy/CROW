@@ -88,6 +88,15 @@ secesp:AddToggle({
     order   = 3,
 })
 
+-- Team Colors: color ESP by player's Roblox team color (box, tracer, skeleton)
+secesp:AddToggle({
+    text    = "Team Colors",
+    state   = false,
+    flag    = "ESPTeamColors",
+    tooltip = "Use each player's team color for box, tracer, and skeleton",
+    order   = 4,
+})
+
 -- ESP Features Toggles
 local ESPBox = secesp:AddToggle({
     text = "Show Box",
@@ -724,8 +733,13 @@ RunService.RenderStepped:Connect(function(delta)
         local boxW, boxH = 50 * scale, 100 * scale
         local boxX, boxY = pos.X - boxW / 2, pos.Y - boxH / 2
 
-        -- When team check is on we only show non-teammates; use enemy color (no ally color). Otherwise color by enemy list.
-        local color = (flags["ESPTeamCheck"] and ESPSettings.EnemyColor) or (EnemyList[player] and ESPSettings.EnemyColor) or ESPSettings.AllyColor
+        -- Team Colors = use player's team color; else team check / enemy list logic
+        local color
+        if flags["ESPTeamColors"] and player.Team and player.Team.TeamColor then
+            color = player.Team.TeamColor.Color
+        else
+            color = (flags["ESPTeamCheck"] and ESPSettings.EnemyColor) or (EnemyList[player] and ESPSettings.EnemyColor) or ESPSettings.AllyColor
+        end
 
         if flags["ESPBox"] and data.Box then
             data.Box.Position = Vector2.new(boxX, boxY)
@@ -850,16 +864,17 @@ RunService.RenderStepped:Connect(function(delta)
                 local headPos = Camera:WorldToViewportPoint(bodyParts.Head.Position)
                 local torsoPos = Camera:WorldToViewportPoint(bodyParts.UpperTorso.Position)
                 
+                local skeletonColor = (flags["ESPTeamColors"] and color) or ESPSettings.SkeletonColor
                 data.Skeleton.HeadTorso.From = Vector2.new(headPos.X, headPos.Y)
                 data.Skeleton.HeadTorso.To = Vector2.new(torsoPos.X, torsoPos.Y)
-                data.Skeleton.HeadTorso.Color = ESPSettings.SkeletonColor
+                data.Skeleton.HeadTorso.Color = skeletonColor
                 data.Skeleton.HeadTorso.Visible = onScreen
 
                 if bodyParts.LeftUpperArm then
                     local armPos = Camera:WorldToViewportPoint(bodyParts.LeftUpperArm.Position)
                     data.Skeleton.TorsoLeftArm.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoLeftArm.To = Vector2.new(armPos.X, armPos.Y)
-                    data.Skeleton.TorsoLeftArm.Color = ESPSettings.SkeletonColor
+                    data.Skeleton.TorsoLeftArm.Color = skeletonColor
                     data.Skeleton.TorsoLeftArm.Visible = onScreen
                 else
                     data.Skeleton.TorsoLeftArm.Visible = false
@@ -869,7 +884,7 @@ RunService.RenderStepped:Connect(function(delta)
                     local armPos = Camera:WorldToViewportPoint(bodyParts.RightUpperArm.Position)
                     data.Skeleton.TorsoRightArm.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoRightArm.To = Vector2.new(armPos.X, armPos.Y)
-                    data.Skeleton.TorsoRightArm.Color = ESPSettings.SkeletonColor
+                    data.Skeleton.TorsoRightArm.Color = skeletonColor
                     data.Skeleton.TorsoRightArm.Visible = onScreen
                 else
                     data.Skeleton.TorsoRightArm.Visible = false
@@ -879,7 +894,7 @@ RunService.RenderStepped:Connect(function(delta)
                     local legPos = Camera:WorldToViewportPoint(bodyParts.LeftLowerLeg.Position)
                     data.Skeleton.TorsoLeftLeg.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoLeftLeg.To = Vector2.new(legPos.X, legPos.Y)
-                    data.Skeleton.TorsoLeftLeg.Color = ESPSettings.SkeletonColor
+                    data.Skeleton.TorsoLeftLeg.Color = skeletonColor
                     data.Skeleton.TorsoLeftLeg.Visible = onScreen
                 else
                     data.Skeleton.TorsoLeftLeg.Visible = false
@@ -889,7 +904,7 @@ RunService.RenderStepped:Connect(function(delta)
                     local legPos = Camera:WorldToViewportPoint(bodyParts.RightLowerLeg.Position)
                     data.Skeleton.TorsoRightLeg.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoRightLeg.To = Vector2.new(legPos.X, legPos.Y)
-                    data.Skeleton.TorsoRightLeg.Color = ESPSettings.SkeletonColor
+                    data.Skeleton.TorsoRightLeg.Color = skeletonColor
                     data.Skeleton.TorsoRightLeg.Visible = onScreen
                 else
                     data.Skeleton.TorsoRightLeg.Visible = false
@@ -908,7 +923,7 @@ RunService.RenderStepped:Connect(function(delta)
         if flags["ShowTracers"] and data.Tracer then
             data.Tracer.From = tracerFromPos
             data.Tracer.To = Vector2.new(pos.X, pos.Y)
-            data.Tracer.Color = ESPSettings.TracerColor
+            data.Tracer.Color = (flags["ESPTeamColors"] and color) or ESPSettings.TracerColor
             data.Tracer.Thickness = ESPSettings.TracerThickness
             data.Tracer.Visible = onScreen
         elseif data.Tracer then
