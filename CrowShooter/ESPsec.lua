@@ -136,11 +136,12 @@ local ShowTool = secesp:AddToggle({
     flag = "ShowTool"
 })
 
-local ESPTeamCheck = secesp:AddToggle({
-    text = "Team check",
-    state = true,
+-- Team check: hide ESP for teammates (only show enemies); same pattern as AimSec Team Check
+secesp:AddToggle({
+    text    = "Team check",
+    state   = true,
+    flag    = "ESPTeamCheck",
     tooltip = "Hide ESP for teammates (only show enemies)",
-    flag = "ESPTeamCheck"
 })
 
 local EnemyList = _G.CROW_EnemyList or {}

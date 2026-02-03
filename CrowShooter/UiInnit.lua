@@ -2685,6 +2685,9 @@ end
                             Outline = true;
                             Parent = objs.holder;
                         })
+                        if toggle.text and toggle.text ~= '' then
+                            objs.text.Text = toggle.text;
+                        end
 
                         utility:Connection(objs.holder.MouseEnter, function()
                             objs.border1.ThemeColor = 'Accent';
