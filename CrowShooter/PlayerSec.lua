@@ -583,13 +583,27 @@ toggleFOV = function(state)
 end
 
 -- Noclip: set CanCollide on all character BaseParts (R6 and R15). Store/restore original so turning off doesn't change parts that had collision off.
+-- R6 uses direct children: Head, Torso, Left Arm, Right Arm, Left Leg, Right Leg (and sometimes HumanoidRootPart). Use both GetDescendants and explicit R6 names so R6 always works.
 local noclipOriginalCollide = {}
+
+local R6_PART_NAMES = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "HumanoidRootPart" }
 
 local function setNoclipPartsCollide(collide)
     if not character or not character.Parent then return end
-    for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if not collide then
+    if not collide then
+        -- All descendants (R15 and any nested parts)
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if noclipOriginalCollide[part] == nil then
+                    noclipOriginalCollide[part] = part.CanCollide
+                end
+                part.CanCollide = false
+            end
+        end
+        -- Explicit R6 direct children (in case GetDescendants order or timing misses them)
+        for _, name in ipairs(R6_PART_NAMES) do
+            local part = character:FindFirstChild(name)
+            if part and part:IsA("BasePart") then
                 if noclipOriginalCollide[part] == nil then
                     noclipOriginalCollide[part] = part.CanCollide
                 end
@@ -613,7 +627,8 @@ toggleNoclip = function(state)
     cleanupConnections("noclip")
     if not character then return end
     if state then
-        local connection = RunService.Stepped:Connect(function()
+        -- Use Heartbeat so noclip runs after physics (helps R6 and games that reset CanCollide)
+        local connection = RunService.Heartbeat:Connect(function()
             if not states.noclipEnabled or not character or not character.Parent then return end
             setNoclipPartsCollide(false)
         end)

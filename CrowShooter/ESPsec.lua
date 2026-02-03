@@ -31,7 +31,7 @@ local ESPObjects = {}
 local VISIBILITY_CACHE_INTERVAL = 0.2
 local ESP_SETTINGS_SYNC_INTERVAL = 3
 
--- Store current settings values with defaults (box/health defaults = min values)
+-- Store current settings; defaults must match slider defaults so visuals and sliders match on load
 local ESPSettings = {
     BoxThickness = 1,
     TextSize = 15,
@@ -40,8 +40,8 @@ local ESPSettings = {
     EnemyColor = Color3.fromRGB(255, 70, 70),
     SkeletonColor = Color3.fromRGB(255, 255, 255),
     TracerColor = Color3.fromRGB(255, 255, 255),
-    TracerOrigin = "Bottom", -- "Bottom", "Top", "Center", "Mouse"
-    HealthBarWidth = 2,
+    TracerOrigin = "Bottom",
+    HealthBarWidth = 4,
     HealthBarOffset = 0,
     ESPScale = 1,
     SkeletonThickness = 1,
@@ -49,7 +49,7 @@ local ESPSettings = {
     NameTextOffset = 16,
     DistanceTextOffset = 2,
     VisibilityTextOffset = 2,
-    MaxDistance = 500 -- 0 = no limit; else hide ESP beyond this many studs
+    MaxDistance = 500
 }
 
 -- Track health bar animation states
@@ -496,6 +496,26 @@ seccustomesp:AddSlider({
     end
 })
 
+-- Sync ESPSettings from library.flags so slider defaults and config load match what ESP draws
+local function syncESPSettingsFromFlags()
+    local lib = library
+    if not lib or not lib.flags then return end
+    local f = lib.flags
+    if f.BoxThickness ~= nil then ESPSettings.BoxThickness = f.BoxThickness end
+    if f.TextSize ~= nil then ESPSettings.TextSize = f.TextSize end
+    if f.HealthBarWidth ~= nil then ESPSettings.HealthBarWidth = f.HealthBarWidth end
+    if f.HealthBarOffset ~= nil then ESPSettings.HealthBarOffset = f.HealthBarOffset end
+    if f.SkeletonThickness ~= nil then ESPSettings.SkeletonThickness = f.SkeletonThickness end
+    if f.TracerThickness ~= nil then ESPSettings.TracerThickness = f.TracerThickness end
+    if f.NameTextOffset ~= nil then ESPSettings.NameTextOffset = f.NameTextOffset end
+    if f.DistanceTextOffset ~= nil then ESPSettings.DistanceTextOffset = f.DistanceTextOffset end
+    if f.VisibilityTextOffset ~= nil then ESPSettings.VisibilityTextOffset = f.VisibilityTextOffset end
+    if f.ESPScale ~= nil then ESPSettings.ESPScale = f.ESPScale / 100 end
+    if f.ESPMaxDistance ~= nil then ESPSettings.MaxDistance = f.ESPMaxDistance end
+    if f.TracerOrigin ~= nil then ESPSettings.TracerOrigin = f.TracerOrigin end
+end
+task.defer(syncESPSettingsFromFlags)
+
 -- Create ESP for a player
 local function createESP(player)
     if player == LocalPlayer or ESPObjects[player] or not player:IsA("Player") then
@@ -706,6 +726,19 @@ RunService.RenderStepped:Connect(function(delta)
         tracerFromPos = Vector2.new(vw * 0.5, vh)
     end
 
+    -- Use flags when present so slider/config values always match what ESP draws
+    local boxThickness = (flags.BoxThickness ~= nil) and flags.BoxThickness or ESPSettings.BoxThickness
+    local textSize = (flags.TextSize ~= nil) and flags.TextSize or ESPSettings.TextSize
+    local healthBarWidth = (flags.HealthBarWidth ~= nil) and flags.HealthBarWidth or ESPSettings.HealthBarWidth
+    local healthBarOffset = (flags.HealthBarOffset ~= nil) and flags.HealthBarOffset or ESPSettings.HealthBarOffset
+    local nameTextOffset = (flags.NameTextOffset ~= nil) and flags.NameTextOffset or ESPSettings.NameTextOffset
+    local distanceTextOffset = (flags.DistanceTextOffset ~= nil) and flags.DistanceTextOffset or ESPSettings.DistanceTextOffset
+    local visibilityTextOffset = (flags.VisibilityTextOffset ~= nil) and flags.VisibilityTextOffset or ESPSettings.VisibilityTextOffset
+    local espScale = (flags.ESPScale ~= nil) and (flags.ESPScale / 100) or ESPSettings.ESPScale
+    local maxDist = (flags.ESPMaxDistance ~= nil) and flags.ESPMaxDistance or ESPSettings.MaxDistance
+    local skeletonThickness = (flags.SkeletonThickness ~= nil) and flags.SkeletonThickness or ESPSettings.SkeletonThickness
+    local tracerThickness = (flags.TracerThickness ~= nil) and flags.TracerThickness or ESPSettings.TracerThickness
+
     for player, data in pairs(ESPObjects) do
         local character = player.Character
         local hrp = character and character:FindFirstChild("HumanoidRootPart")
@@ -724,12 +757,11 @@ RunService.RenderStepped:Connect(function(delta)
 
         local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
         local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
-        local maxDist = ESPSettings.MaxDistance or 0
         if maxDist > 0 and distance > maxDist then
             setESPDataVisible(data, false)
             continue
         end
-        local scale = math.clamp(1 / (distance / 50), 0.5, 2) * ESPSettings.ESPScale
+        local scale = math.clamp(1 / (distance / 50), 0.5, 2) * espScale
         local boxW, boxH = 50 * scale, 100 * scale
         local boxX, boxY = pos.X - boxW / 2, pos.Y - boxH / 2
 
@@ -745,7 +777,7 @@ RunService.RenderStepped:Connect(function(delta)
             data.Box.Position = Vector2.new(boxX, boxY)
             data.Box.Size = Vector2.new(boxW, boxH)
             data.Box.Color = color
-            data.Box.Thickness = ESPSettings.BoxThickness
+            data.Box.Thickness = boxThickness
             data.Box.Visible = onScreen
         elseif data.Box then
             data.Box.Visible = false
@@ -753,15 +785,15 @@ RunService.RenderStepped:Connect(function(delta)
 
         if flags["ShowHealthBar"] and data.HealthOutline and data.HealthBar then
             local healthRatio = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-            local barWidth = ESPSettings.HealthBarWidth
+            local barWidth = healthBarWidth
             local state = HealthBarStates[player]
             state.CurrentHeight = state.CurrentHeight + (healthRatio - state.CurrentHeight) * math.min(10 * delta, 1)
             
-            data.HealthOutline.Position = Vector2.new(boxX - barWidth - ESPSettings.HealthBarOffset, boxY)
+            data.HealthOutline.Position = Vector2.new(boxX - barWidth - healthBarOffset, boxY)
             data.HealthOutline.Size = Vector2.new(barWidth, boxH)
             data.HealthOutline.Visible = onScreen
 
-            data.HealthBar.Position = Vector2.new(boxX - barWidth - ESPSettings.HealthBarOffset, boxY + (1 - state.CurrentHeight) * boxH)
+            data.HealthBar.Position = Vector2.new(boxX - barWidth - healthBarOffset, boxY + (1 - state.CurrentHeight) * boxH)
             data.HealthBar.Size = Vector2.new(barWidth, boxH * state.CurrentHeight)
             data.HealthBar.Color = Color3.fromRGB(255 * (1 - state.CurrentHeight), 255 * state.CurrentHeight, 0)
             data.HealthBar.Visible = onScreen
@@ -773,9 +805,9 @@ RunService.RenderStepped:Connect(function(delta)
         local textColor = ESPSettings.TextColor
         if flags["ShowDistance"] and data.Distance then
             data.Distance.Text = "[" .. math.floor(distance) .. "]"
-            data.Distance.Position = Vector2.new(pos.X, boxY + boxH + ESPSettings.DistanceTextOffset)
+            data.Distance.Position = Vector2.new(pos.X, boxY + boxH + distanceTextOffset)
             data.Distance.Color = textColor
-            data.Distance.Size = ESPSettings.TextSize
+            data.Distance.Size = textSize
             data.Distance.Visible = onScreen
         elseif data.Distance then
             data.Distance.Visible = false
@@ -783,9 +815,9 @@ RunService.RenderStepped:Connect(function(delta)
         
         if flags["ShowNames"] and data.Name then
             data.Name.Text = player.Name
-            data.Name.Position = Vector2.new(pos.X, boxY - ESPSettings.NameTextOffset)
+            data.Name.Position = Vector2.new(pos.X, boxY - nameTextOffset)
             data.Name.Color = textColor
-            data.Name.Size = ESPSettings.TextSize
+            data.Name.Size = textSize
             data.Name.Visible = onScreen
         elseif data.Name then
             data.Name.Visible = false
@@ -800,12 +832,12 @@ RunService.RenderStepped:Connect(function(delta)
                 isVisible = visibilityCache[player] == true
             end
             local visText = isVisible and "Visible" or "Hidden"
-            local yOffset = flags["ShowDistance"] and ESPSettings.DistanceTextOffset + ESPSettings.TextSize + ESPSettings.VisibilityTextOffset or ESPSettings.VisibilityTextOffset
+            local yOffset = flags["ShowDistance"] and distanceTextOffset + textSize + visibilityTextOffset or visibilityTextOffset
             
             data.Visibility.Text = visText
             data.Visibility.Position = Vector2.new(pos.X, boxY + boxH + yOffset)
             data.Visibility.Color = textColor
-            data.Visibility.Size = ESPSettings.TextSize
+            data.Visibility.Size = textSize
             data.Visibility.Visible = onScreen
         elseif data.Visibility then
             data.Visibility.Visible = false
@@ -838,13 +870,13 @@ RunService.RenderStepped:Connect(function(delta)
             end
             local toolName = (rawName == "" or rawName:lower() == "unarmed") and "" or rawName
             data.Tool.Text = toolName
-            local toolYOff = ESPSettings.DistanceTextOffset + ESPSettings.TextSize + 4
+            local toolYOff = distanceTextOffset + textSize + 4
             if flags["ShowVisibility"] then
-                toolYOff = toolYOff + ESPSettings.TextSize + ESPSettings.VisibilityTextOffset
+                toolYOff = toolYOff + textSize + visibilityTextOffset
             end
             data.Tool.Position = Vector2.new(pos.X, boxY + boxH + toolYOff)
             data.Tool.Color = textColor
-            data.Tool.Size = ESPSettings.TextSize
+            data.Tool.Size = textSize
             data.Tool.Visible = onScreen and (toolName ~= "")
         elseif data.Tool then
             data.Tool.Visible = false
@@ -868,6 +900,7 @@ RunService.RenderStepped:Connect(function(delta)
                 data.Skeleton.HeadTorso.From = Vector2.new(headPos.X, headPos.Y)
                 data.Skeleton.HeadTorso.To = Vector2.new(torsoPos.X, torsoPos.Y)
                 data.Skeleton.HeadTorso.Color = skeletonColor
+                data.Skeleton.HeadTorso.Thickness = skeletonThickness
                 data.Skeleton.HeadTorso.Visible = onScreen
 
                 if bodyParts.LeftUpperArm then
@@ -875,6 +908,7 @@ RunService.RenderStepped:Connect(function(delta)
                     data.Skeleton.TorsoLeftArm.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoLeftArm.To = Vector2.new(armPos.X, armPos.Y)
                     data.Skeleton.TorsoLeftArm.Color = skeletonColor
+                    data.Skeleton.TorsoLeftArm.Thickness = skeletonThickness
                     data.Skeleton.TorsoLeftArm.Visible = onScreen
                 else
                     data.Skeleton.TorsoLeftArm.Visible = false
@@ -885,6 +919,7 @@ RunService.RenderStepped:Connect(function(delta)
                     data.Skeleton.TorsoRightArm.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoRightArm.To = Vector2.new(armPos.X, armPos.Y)
                     data.Skeleton.TorsoRightArm.Color = skeletonColor
+                    data.Skeleton.TorsoRightArm.Thickness = skeletonThickness
                     data.Skeleton.TorsoRightArm.Visible = onScreen
                 else
                     data.Skeleton.TorsoRightArm.Visible = false
@@ -895,6 +930,7 @@ RunService.RenderStepped:Connect(function(delta)
                     data.Skeleton.TorsoLeftLeg.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoLeftLeg.To = Vector2.new(legPos.X, legPos.Y)
                     data.Skeleton.TorsoLeftLeg.Color = skeletonColor
+                    data.Skeleton.TorsoLeftLeg.Thickness = skeletonThickness
                     data.Skeleton.TorsoLeftLeg.Visible = onScreen
                 else
                     data.Skeleton.TorsoLeftLeg.Visible = false
@@ -905,6 +941,7 @@ RunService.RenderStepped:Connect(function(delta)
                     data.Skeleton.TorsoRightLeg.From = Vector2.new(torsoPos.X, torsoPos.Y)
                     data.Skeleton.TorsoRightLeg.To = Vector2.new(legPos.X, legPos.Y)
                     data.Skeleton.TorsoRightLeg.Color = skeletonColor
+                    data.Skeleton.TorsoRightLeg.Thickness = skeletonThickness
                     data.Skeleton.TorsoRightLeg.Visible = onScreen
                 else
                     data.Skeleton.TorsoRightLeg.Visible = false
@@ -924,7 +961,7 @@ RunService.RenderStepped:Connect(function(delta)
             data.Tracer.From = tracerFromPos
             data.Tracer.To = Vector2.new(pos.X, pos.Y)
             data.Tracer.Color = (flags["ESPTeamColors"] and color) or ESPSettings.TracerColor
-            data.Tracer.Thickness = ESPSettings.TracerThickness
+            data.Tracer.Thickness = tracerThickness
             data.Tracer.Visible = onScreen
         elseif data.Tracer then
             data.Tracer.Visible = false
