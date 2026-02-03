@@ -691,7 +691,7 @@ fov_circle.ZIndex = 999
 fov_circle.Transparency = 1
 fov_circle.Color = Color3.fromRGB(255, 0, 0)
 
--- Expected Arguments for hooking - EXPANDED TO INCLUDE MORE METHODS
+-- Expected Arguments (exact from Universal Silent Aim - Averiias, Stefanuk12, xaxa)
 local ExpectedArguments = {
     FindPartOnRayWithIgnoreList = {
         ArgCountRequired = 3,
@@ -716,23 +716,21 @@ local ExpectedArguments = {
         Args = {
             "Instance", "Vector3", "Vector3", "RaycastParams"
         }
-    },
-    RaycastWithIgnoreList = {
-        ArgCountRequired = 3,
-        Args = {
-            "Instance", "Vector3", "Vector3", "table"
-        }
     }
 }
 
--- Target parts mapping (Universal: Head, HumanoidRootPart, Random)
 local ValidTargetParts = {"Head", "HumanoidRootPart"}
-local TARGET_PARTS = {
-    Head = {"Head"},
-    Torso = {"HumanoidRootPart"},
-    Legs = {"Left Leg", "LeftUpperLeg"},
-    Random = {"Head", "HumanoidRootPart"}
-}
+local PredictionAmount = 0.165
+
+-- Map CROW UI (SilentTargetParts) to Universal TargetPart: "Head", "HumanoidRootPart", or "Random"
+local function getTargetPartValue()
+    local tp = library and library.flags and library.flags["SilentTargetParts"]
+    if not tp or not tp[1] then return "HumanoidRootPart" end
+    if tp[1] == "Random" then return "Random" end
+    if tp[1] == "Head" then return "Head" end
+    if tp[1] == "Torso" then return "HumanoidRootPart" end
+    return "HumanoidRootPart"
+end
 
 -- Utility Functions
 function CalculateChance(Percentage)
@@ -763,142 +761,57 @@ local function getDirection(Origin, Position)
     return (Position - Origin).Unit * 1000
 end
 
--- Optimized mouse position function with caching
+-- Exact from Universal Silent Aim
 local function getMousePosition()
-    local currentTime = tick()
-    if currentTime - LastMouseUpdate > MOUSE_UPDATE_INTERVAL then
-        local fn = rawGetMouseLocation or GetMouseLocation
-        CachedMousePosition = fn(UserInputService)
-        LastMouseUpdate = currentTime
-    end
-    return CachedMousePosition
+    return GetMouseLocation(UserInputService)
 end
 
+-- Exact from Universal Silent Aim (Options.TargetPart.Value -> getTargetPartValue())
 local function IsPlayerVisible(Player)
     local PlayerCharacter = Player.Character
     local LocalPlayerCharacter = LocalPlayer.Character
     
-    if not (PlayerCharacter or LocalPlayerCharacter) then return false end
+    if not (PlayerCharacter or LocalPlayerCharacter) then return end 
     
-    -- Universal: use target part or HumanoidRootPart for ray check
-    local selectedParts = (library and library.flags and library.flags["SilentTargetParts"]) or {"Torso"}
-    local partName = (selectedParts[1] == "Random" and "HumanoidRootPart") or (TARGET_PARTS[selectedParts[1]] and TARGET_PARTS[selectedParts[1]][1]) or "HumanoidRootPart"
-    local PlayerRoot = FindFirstChild(PlayerCharacter, partName) or FindFirstChild(PlayerCharacter, "HumanoidRootPart")
+    local PlayerRoot = FindFirstChild(PlayerCharacter, getTargetPartValue()) or FindFirstChild(PlayerCharacter, "HumanoidRootPart")
     
-    if not PlayerRoot then return false end
+    if not PlayerRoot then return end 
     
     local CastPoints, IgnoreList = {PlayerRoot.Position, LocalPlayerCharacter, PlayerCharacter}, {LocalPlayerCharacter, PlayerCharacter}
     local ObscuringObjects = #GetPartsObscuringTarget(Camera, CastPoints, IgnoreList)
     
-    return ObscuringObjects == 0
+    return ((ObscuringObjects == 0 and true) or (ObscuringObjects > 0 and false))
 end
 
--- Function to get selected target parts
-local function getSelectedTargetParts()
-    local selectedParts = {}
-    local selectedBodyParts = (library and library.flags and library.flags["SilentTargetParts"]) or {"Torso"}
-    
-    -- Add parts based on selection
-    for _, bodyPart in ipairs(selectedBodyParts) do
-        if TARGET_PARTS[bodyPart] then
-            for _, part in ipairs(TARGET_PARTS[bodyPart]) do
-                table.insert(selectedParts, part)
-            end
-        end
-    end
-    
-    -- If no parts selected, default to Torso (HumanoidRootPart) to match Universal
-    if #selectedParts == 0 then
-        selectedParts = TARGET_PARTS.Torso
-    end
-    
-    return selectedParts
-end
-
--- Function to get target part from character (Universal: Random = Head or HumanoidRootPart at random)
-local function getTargetPart(Character)
-    local selectedBodyParts = (library and library.flags and library.flags["SilentTargetParts"]) or {"Torso"}
-    -- Random = pick Head or HumanoidRootPart at random per Universal
-    if selectedBodyParts[1] == "Random" then
-        local partName = ValidTargetParts[math.random(1, #ValidTargetParts)]
-        return FindFirstChild(Character, partName)
-    end
-    local selectedParts = getSelectedTargetParts()
-    local availableParts = {}
-    for _, partName in ipairs(selectedParts) do
-        local part = FindFirstChild(Character, partName)
-        if part then
-            table.insert(availableParts, part)
-        end
-    end
-    if #availableParts > 0 then
-        return availableParts[math.random(1, #availableParts)]
-    end
-    return FindFirstChild(Character, "HumanoidRootPart")
-end
-
--- Apply silent aim prediction (simplified - removed auto prediction)
-local function applySilentPrediction(part)
-    if not part or not part.Position then return part and part.Position or Vector3.new(0,0,0) end
-    if not library or not library.flags then return part.Position end
-    local mode = library.flags["SilentPredictionMode"] or "Off"
-    if mode == "Off" then return part.Position end
-    local vel = part.Velocity or Vector3.new(0,0,0)
-    if mode == "Manual" then
-        return part.Position + vel * (library.flags["SilentManualPrediction"] or 0)
-    end
-    return part.Position
-end
-
--- Optimized closest player function with caching
+-- Exact from Universal Silent Aim (Toggles/Options -> library.flags)
 local function getClosestPlayer()
-    if not library or not library.flags then return nil end
-    local currentTime = tick()
-    
-    -- Use cached result if within update interval
-    if currentTime - LastPlayerUpdate < PLAYER_UPDATE_INTERVAL and CachedClosestPlayer then
-        return CachedClosestPlayer
-    end
-    
+    local TargetPart = getTargetPartValue()
+    if not TargetPart then return end
     local Closest
     local DistanceToMouse
-    local mousePos = getMousePosition()
-    
+    local Radius = (library and library.flags and library.flags["SilentFOVSize"]) or 130
     for _, Player in next, GetPlayers(Players) do
         if Player == LocalPlayer then continue end
-        if library.flags["SilentTeamCheck"] then
-            local isEnemyFn = _G.CROW_IsEnemy
-            local enemy = (isEnemyFn and isEnemyFn(Player)) or (Player.Team ~= LocalPlayer.Team or not LocalPlayer.Team)
-            if not enemy then continue end
-        end
+        if (library and library.flags and library.flags["SilentTeamCheck"]) and Player.Team == LocalPlayer.Team then continue end
 
         local Character = Player.Character
         if not Character then continue end
         
-        if library.flags["SilentVisibleCheck"] and not IsPlayerVisible(Player) then continue end
-        if library.flags["SilentForceFieldCheck"] and Character:FindFirstChildWhichIsA("ForceField") then continue end
+        if (library and library.flags and library.flags["SilentVisibleCheck"]) and not IsPlayerVisible(Player) then continue end
 
         local HumanoidRootPart = FindFirstChild(Character, "HumanoidRootPart")
         local Humanoid = FindFirstChild(Character, "Humanoid")
         if not HumanoidRootPart or not Humanoid or Humanoid and Humanoid.Health <= 0 then continue end
 
-        local targetPart = getTargetPart(Character)
-        if not targetPart then continue end
-
-        local ScreenPosition, OnScreen = getPositionOnScreen(targetPart.Position)
+        local ScreenPosition, OnScreen = getPositionOnScreen(HumanoidRootPart.Position)
         if not OnScreen then continue end
 
-        local Distance = (mousePos - ScreenPosition).Magnitude
-        if Distance <= (DistanceToMouse or library.flags["SilentFOVSize"] or 130) then
-            Closest = targetPart
+        local Distance = (getMousePosition() - ScreenPosition).Magnitude
+        if Distance <= (DistanceToMouse or Radius or 2000) then
+            Closest = ((TargetPart == "Random" and Character[ValidTargetParts[math.random(1, #ValidTargetParts)]]) or Character[TargetPart])
             DistanceToMouse = Distance
         end
     end
-    
-    -- Update cache
-    CachedClosestPlayer = Closest
-    LastPlayerUpdate = currentTime
-    
     return Closest
 end
 
@@ -1376,20 +1289,20 @@ local function applyMouseHitTargetHook()
                 return nil
             end
             local flags = library and library.flags
-            if flags and flags["SilentAimEnabled"] and (flags["SilentAimActive"] ~= false) and (flags["SilentMethod"] == "Mouse.Hit/Target" or flags["SilentMethod"] == "All Methods") then
-                if CalculateChance(flags["SilentHitChance"] or 100) then
-                    local HitPart = getClosestPlayer()
-                    if HitPart then
-                        if Index == "Target" or Index == "target" then
-                            return HitPart
-                        elseif Index == "Hit" or Index == "hit" then
-                            local usePred = (flags["SilentPredictionMode"] == "Manual") and (flags["SilentManualPrediction"] or 0.165)
-                            if usePred and usePred > 0 and HitPart.Velocity then
-                                return (HitPart.CFrame + (HitPart.Velocity * usePred))
-                            end
-                            return HitPart.CFrame
-                        end
-                    end
+            if flags and flags["SilentAimEnabled"] and (flags["SilentAimActive"] ~= false) and (flags["SilentMethod"] == "Mouse.Hit/Target" or flags["SilentMethod"] == "All Methods") and getClosestPlayer() then
+                local HitPart = getClosestPlayer()
+                if Index == "Target" or Index == "target" then
+                    return HitPart
+                elseif Index == "Hit" or Index == "hit" then
+                    local Prediction = (flags["SilentPredictionMode"] == "Manual")
+                    local Amount = (flags["SilentManualPrediction"]) or PredictionAmount
+                    return ((Prediction and (HitPart.CFrame + (HitPart.Velocity * Amount))) or (not Prediction and HitPart.CFrame))
+                elseif Index == "X" or Index == "x" then
+                    return oldMouseIndex(self, Index)
+                elseif Index == "Y" or Index == "y" then
+                    return oldMouseIndex(self, Index)
+                elseif Index == "UnitRay" then
+                    return oldMouseIndex(self, Index)
                 end
             end
             if type(oldMouseIndex) == "function" then return oldMouseIndex(self, Index) end
@@ -1422,45 +1335,45 @@ local function applyNamecallHooks()
             local chance = CalculateChance(library and library.flags and library.flags["SilentHitChance"] or 100)
             if library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false) and self == workspace and checkcaller and not checkcaller() and chance then
                 local silentMethod = library.flags["SilentMethod"]
-                if Method == "FindPartOnRayWithIgnoreList" and (silentMethod == "FindPartOnRayWithIgnoreList" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
-                    if ValidateArguments(Arguments, ExpectedArguments.FindPartOnRayWithIgnoreList) then
-                        local A_Ray = Arguments[2]
+                if Method == "FindPartOnRayWithIgnoreList" and (silentMethod == Method or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments({self, table.unpack(Arguments)}, ExpectedArguments.FindPartOnRayWithIgnoreList) then
+                        local A_Ray = Arguments[1]
                         local HitPart = getClosestPlayer()
                         if HitPart then
                             local Origin = A_Ray.Origin
                             local Direction = getDirection(Origin, HitPart.Position)
-                            Arguments[2] = Ray.new(Origin, Direction)
+                            Arguments[1] = Ray.new(Origin, Direction)
                             return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
-                elseif Method == "FindPartOnRayWithWhitelist" and (silentMethod == "FindPartOnRayWithWhitelist" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
-                    if ValidateArguments(Arguments, ExpectedArguments.FindPartOnRayWithWhitelist) then
-                        local A_Ray = Arguments[2]
+                elseif Method == "FindPartOnRayWithWhitelist" and (silentMethod == Method or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments({self, table.unpack(Arguments)}, ExpectedArguments.FindPartOnRayWithWhitelist) then
+                        local A_Ray = Arguments[1]
                         local HitPart = getClosestPlayer()
                         if HitPart then
                             local Origin = A_Ray.Origin
                             local Direction = getDirection(Origin, HitPart.Position)
-                            Arguments[2] = Ray.new(Origin, Direction)
+                            Arguments[1] = Ray.new(Origin, Direction)
                             return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
-                elseif (Method == "FindPartOnRay" or Method == "findPartOnRay") and (silentMethod == "FindPartOnRay" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
-                    if ValidateArguments(Arguments, ExpectedArguments.FindPartOnRay) then
-                        local A_Ray = Arguments[2]
+                elseif (Method == "FindPartOnRay" or Method == "findPartOnRay") and silentMethod and (silentMethod == Method or silentMethod:lower() == Method:lower() or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments({self, table.unpack(Arguments)}, ExpectedArguments.FindPartOnRay) then
+                        local A_Ray = Arguments[1]
                         local HitPart = getClosestPlayer()
                         if HitPart then
                             local Origin = A_Ray.Origin
                             local Direction = getDirection(Origin, HitPart.Position)
-                            Arguments[2] = Ray.new(Origin, Direction)
+                            Arguments[1] = Ray.new(Origin, Direction)
                             return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
-                elseif Method == "Raycast" and (silentMethod == "Raycast" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
-                    if ValidateArguments(Arguments, ExpectedArguments.Raycast) then
-                        local A_Origin = Arguments[2]
+                elseif Method == "Raycast" and (silentMethod == Method or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments({self, table.unpack(Arguments)}, ExpectedArguments.Raycast) then
+                        local A_Origin = Arguments[1]
                         local HitPart = getClosestPlayer()
                         if HitPart then
-                            Arguments[3] = getDirection(A_Origin, HitPart.Position)
+                            Arguments[2] = getDirection(A_Origin, HitPart.Position)
                             return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
