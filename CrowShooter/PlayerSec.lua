@@ -902,7 +902,7 @@ toggleInfiniteJump = function(state)
     trackConnection(conn, "infinite_jump")
 end
 
--- Spinbot: rotate character around Y axis (degrees per second). Use RenderStepped so it runs after movement (works in first person / while walking).
+-- Spinbot: rotate character around Y axis (degrees per second). Run in task.defer so we apply after shift lock / first-person camera (so it works in shift lock and first person).
 local spinbotSpeed = 360
 local spinbotLastTick = 0
 toggleSpinbot = function(state)
@@ -917,23 +917,31 @@ toggleSpinbot = function(state)
         local now = tick()
         local dt = math.min(now - spinbotLastTick, 0.05)
         spinbotLastTick = now
-        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(spinbotSpeed * dt), 0)
+        local rotation = CFrame.Angles(0, math.rad(spinbotSpeed * dt), 0)
+        task.defer(function()
+            if not rootPart or not rootPart.Parent then return end
+            rootPart.CFrame = rootPart.CFrame * rotation
+        end)
     end)
     trackConnection(conn, "spinbot")
 end
 
--- Anti-aim: small random Y rotation jitter to make aim harder
+-- Anti-aim: small random Y rotation jitter to make aim harder. Run in RenderStepped + task.defer so we apply after shift lock / first-person camera (works in shift lock and first person).
 local antiAimIntensity = 15
 toggleAntiAim = function(state)
     states.antiAimEnabled = state
     cleanupConnections("anti_aim")
     if not state then return end
-    local conn = RunService.Heartbeat:Connect(function()
+    local conn = RunService.RenderStepped:Connect(function()
         if not states.antiAimEnabled or not character then return end
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if not rootPart then return end
         local jitter = (math.random() - 0.5) * 2 * antiAimIntensity
-        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(jitter), 0)
+        local rotation = CFrame.Angles(0, math.rad(jitter), 0)
+        task.defer(function()
+            if not rootPart or not rootPart.Parent then return end
+            rootPart.CFrame = rootPart.CFrame * rotation
+        end)
     end)
     trackConnection(conn, "anti_aim")
 end
