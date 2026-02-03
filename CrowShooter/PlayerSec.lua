@@ -882,17 +882,22 @@ flyToggle:AddBind({
     end
 })
 
--- Infinite Jump: apply upward velocity on every jump input (works in air)
+-- Infinite Jump: when in air (Jumping/Freefall), apply upward velocity on JumpRequest (common executor pattern)
 toggleInfiniteJump = function(state)
     states.infiniteJumpEnabled = state
     cleanupConnections("infinite_jump")
     if not state then return end
     local conn = UserInputService.JumpRequest:Connect(function()
         if not states.infiniteJumpEnabled or not character or not humanoid then return end
+        local stateType = humanoid:GetState()
+        if stateType ~= Enum.HumanoidStateType.Jumping and stateType ~= Enum.HumanoidStateType.Freefall then
+            return
+        end
         local rootPart = character:FindFirstChild("HumanoidRootPart")
         if not rootPart then return end
         local v = rootPart.AssemblyLinearVelocity or rootPart.Velocity
-        rootPart.AssemblyLinearVelocity = v + Vector3.new(0, jumpValue and jumpValue > 0 and jumpValue * 0.8 or 45, 0)
+        local jumpPower = (jumpValue and jumpValue > 0) and jumpValue or 50
+        rootPart.AssemblyLinearVelocity = Vector3.new(v.X, jumpPower, v.Z)
     end)
     trackConnection(conn, "infinite_jump")
 end

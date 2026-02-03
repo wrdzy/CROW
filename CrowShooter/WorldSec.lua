@@ -131,7 +131,7 @@ _G.WorldConfigFlags = {
     FullBright = true, NoShadows = true, NoFog = true,
     WorldBrightness = true, WorldExposure = true,
     ColorCorrectionEnabled = true, CCBrightness = true, CCContrast = true, CCSaturation = true, CCTintColor = true,
-    AmbientColor = true, FogColor = true, OutdoorAmbientColor = true,
+    AmbientColor = true, OutdoorAmbientColor = true,
     TimeOfDay = true,
     BlurEnabled = true, BlurSize = true,
     DepthOfFieldEnabled = true, DOFFocusDistance = true, DOFInFocusRadius = true, DOFFarIntensity = true, DOFNearIntensity = true,
@@ -395,20 +395,6 @@ ColorSection:AddColor({
     risky = false,
     callback = function(color)
         Lighting.Ambient = color
-    end
-})
-
-ColorSection:AddColor({
-    enabled = true,
-    text = "Fog Color",
-    tooltip = "Change fog color",
-    color = orig.FogColor or Color3.fromRGB(192, 192, 192),
-    flag = "FogColor",
-    trans = 0,
-    open = false,
-    risky = false,
-    callback = function(color)
-        Lighting.FogColor = color
     end
 })
 
@@ -729,18 +715,10 @@ UtilitySection:AddSeparator({ text = "Performance" })
 UtilitySection:AddButton({
     enabled = true,
     text = "Potato Mode",
-    tooltip = "Max performance: remove textures/decals, disable particles, full bright, no shadows/fog",
+    tooltip = "Max performance: remove textures/decals, disable particles, no shadows, no fog (lighting kept minimal)",
     callback = function()
-        -- Lighting: full bright, no shadows, no fog
-        Lighting.Brightness = 2
-        Lighting.Ambient = Color3.new(1, 1, 1)
-        Lighting.ColorShift_Bottom = Color3.new(1, 1, 1)
-        Lighting.ColorShift_Top = Color3.new(1, 1, 1)
-        Lighting.EnvironmentDiffuseScale = 1
-        Lighting.EnvironmentSpecularScale = 1
+        -- Only disable shadows and fog; don't change brightness/ambient (avoids super bright)
         Lighting.GlobalShadows = false
-        Lighting.OutdoorAmbient = Color3.new(1, 1, 1)
-        Lighting.ShadowSoftness = 0
         Lighting.FogStart = 0
         Lighting.FogEnd = math.huge
         -- Disable CROW post-effects
@@ -929,7 +907,6 @@ local function syncWorldUIFromLighting()
     set("WorldExposure", Lighting.ExposureCompensation, "slider")
     set("ColorCorrectionEnabled", false, "toggle")
     set("AmbientColor", Lighting.Ambient, "color")
-    set("FogColor", Lighting.FogColor, "color")
     set("OutdoorAmbientColor", Lighting.OutdoorAmbient, "color")
     set("TimeOfDay", Lighting.ClockTime, "slider")
     set("BlurEnabled", false, "toggle")

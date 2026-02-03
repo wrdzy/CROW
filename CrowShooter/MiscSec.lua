@@ -16,9 +16,9 @@ end
 local library = _G.library or _G.CROW
 if not library then return end
 
-local MiscMain = _G.MiscTab:AddSection("Misc", 1)
-local MiscCombat = _G.MiscTab:AddSection("Combat", 2)
-local MiscVisual = _G.MiscTab:AddSection("Visual", 2)
+-- Sections: put Combat first (side 1) so tab shows content by default; other sections on side 2
+local MiscCombat = _G.MiscTab:AddSection("Combat", 1)
+local MiscVisual = _G.MiscTab:AddSection("Visual", 1)
 local MiscInfo = _G.MiscTab:AddSection("Info", 2)
 local MiscUtility = _G.MiscTab:AddSection("Utility", 2)
 
