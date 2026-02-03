@@ -671,7 +671,3 @@ _G.MiscSecCleanup = function()
     pcall(function() fpsText:Remove() end)
     for _, line in pairs(hitMarkerLines) do pcall(function() line:Remove() end) end
 end
-</think>
-Fixing MiscSec: correcting the triggerbot/hit-marker logic and removing the duplicate/invalid tail.
-<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>
-StrReplace
