@@ -684,7 +684,7 @@ local PLAYER_UPDATE_INTERVAL = 0.00833 -- ~120 FPS
 local fov_circle = Drawing.new("Circle")
 fov_circle.Thickness = 1
 fov_circle.NumSides = 100
-fov_circle.Radius = 50
+fov_circle.Radius = 130
 fov_circle.Filled = false
 fov_circle.Visible = false
 fov_circle.ZIndex = 999
@@ -791,7 +791,7 @@ end
 -- Function to get selected target parts
 local function getSelectedTargetParts()
     local selectedParts = {}
-    local selectedBodyParts = (library and library.flags and library.flags["SilentTargetParts"]) or {"Head"}
+    local selectedBodyParts = (library and library.flags and library.flags["SilentTargetParts"]) or {"Torso"}
     
     -- Add parts based on selection
     for _, bodyPart in ipairs(selectedBodyParts) do
@@ -802,9 +802,9 @@ local function getSelectedTargetParts()
         end
     end
     
-    -- If no parts selected, default to Head
+    -- If no parts selected, default to Torso (HumanoidRootPart) to match Universal
     if #selectedParts == 0 then
-        selectedParts = TARGET_PARTS.Head
+        selectedParts = TARGET_PARTS.Torso
     end
     
     return selectedParts
@@ -879,12 +879,11 @@ local function getClosestPlayer()
         local targetPart = getTargetPart(Character)
         if not targetPart then continue end
 
-        local targetPos = applySilentPrediction(targetPart)
-        local ScreenPosition, OnScreen = getPositionOnScreen(targetPos)
+        local ScreenPosition, OnScreen = getPositionOnScreen(targetPart.Position)
         if not OnScreen then continue end
 
         local Distance = (mousePos - ScreenPosition).Magnitude
-        if Distance <= (DistanceToMouse or library.flags["SilentFOVSize"] or 50) then
+        if Distance <= (DistanceToMouse or library.flags["SilentFOVSize"] or 130) then
             Closest = targetPart
             DistanceToMouse = Distance
         end
@@ -923,7 +922,7 @@ function applyWorkspaceHooks()
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
                     if silentAimActive and (silentMethod == "Raycast" or silentMethod == "All Methods") and CalculateChance(library.flags["SilentHitChance"] or 100) then
                         local HitPart = getClosestPlayer()
-                        if HitPart then direction = getDirection(origin, applySilentPrediction(HitPart)) end
+                        if HitPart then direction = getDirection(origin, HitPart.Position) end
                     end
                 end)
                 return (oldRaycast or orig)(self, origin, direction, raycastParams)
@@ -940,7 +939,7 @@ function applyWorkspaceHooks()
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
                     if silentAimActive and (silentMethod == "FindPartOnRayWithIgnoreList" or silentMethod == "All Methods") and CalculateChance(library.flags["SilentHitChance"] or 100) then
                         local HitPart = getClosestPlayer()
-                        if HitPart and ray and ray.Origin then ray = Ray.new(ray.Origin, getDirection(ray.Origin, applySilentPrediction(HitPart))) end
+                        if HitPart and ray and ray.Origin then ray = Ray.new(ray.Origin, getDirection(ray.Origin, HitPart.Position)) end
                     end
                 end)
                 return (oldFindPartOnRayWithIgnoreList or orig)(self, ray, ...)
@@ -957,7 +956,7 @@ function applyWorkspaceHooks()
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
                     if silentAimActive and (silentMethod == "FindPartOnRayWithWhitelist" or silentMethod == "All Methods") and CalculateChance(library.flags["SilentHitChance"] or 100) then
                         local HitPart = getClosestPlayer()
-                        if HitPart and ray and ray.Origin then ray = Ray.new(ray.Origin, getDirection(ray.Origin, applySilentPrediction(HitPart))) end
+                        if HitPart and ray and ray.Origin then ray = Ray.new(ray.Origin, getDirection(ray.Origin, HitPart.Position)) end
                     end
                 end)
                 return (oldFindPartOnRayWithWhitelist or orig)(self, ray, ...)
@@ -974,7 +973,7 @@ function applyWorkspaceHooks()
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
                     if silentAimActive and (silentMethod == "FindPartOnRay" or silentMethod == "All Methods") and CalculateChance(library.flags["SilentHitChance"] or 100) then
                         local HitPart = getClosestPlayer()
-                        if HitPart and ray and ray.Origin then ray = Ray.new(ray.Origin, getDirection(ray.Origin, applySilentPrediction(HitPart))) end
+                        if HitPart and ray and ray.Origin then ray = Ray.new(ray.Origin, getDirection(ray.Origin, HitPart.Position)) end
                     end
                 end)
                 return (oldFindPartOnRay or orig)(self, ray, ...)
@@ -992,7 +991,7 @@ function applyWorkspaceHooks()
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
                     if silentAimActive and (silentMethod == "RaycastWithIgnoreList" or silentMethod == "All Methods") and CalculateChance(library.flags["SilentHitChance"] or 100) then
                         local HitPart = getClosestPlayer()
-                        if HitPart then direction = getDirection(origin, applySilentPrediction(HitPart)) end
+                        if HitPart then direction = getDirection(origin, HitPart.Position) end
                     end
                 end)
                 return (oldRaycastWithIgnoreList or orig)(self, origin, direction, ignoreList)
@@ -1022,8 +1021,7 @@ function applyCameraHooks()
                         local HitPart = getClosestPlayer()
                         if HitPart then
                             local origin = (self and self.CFrame and self.CFrame.Position) or Camera.CFrame.Position
-                            local targetPos = applySilentPrediction(HitPart)
-                            local dir = (targetPos - origin).Unit * 10000
+                            local dir = getDirection(origin, HitPart.Position)
                             return Ray.new(origin, dir)
                         end
                     end
@@ -1044,8 +1042,7 @@ function applyCameraHooks()
                         local HitPart = getClosestPlayer()
                         if HitPart then
                             local origin = (self and self.CFrame and self.CFrame.Position) or Camera.CFrame.Position
-                            local targetPos = applySilentPrediction(HitPart)
-                            local dir = (targetPos - origin).Unit * 10000
+                            local dir = getDirection(origin, HitPart.Position)
                             return Ray.new(origin, dir)
                         end
                     end
@@ -1137,7 +1134,7 @@ SilentAimSection:AddToggle({
 
 SilentAimSection:AddList({
     text = "Target Body Parts",
-    selected = "Head",
+    selected = "Torso",
     multi = true,
     values = {"Head", "Torso", "Legs"},
     flag = "SilentTargetParts",
@@ -1150,8 +1147,8 @@ SilentAimSection:AddList({
 -- Namecall (Universal) = single __namecall hook catches any Ray method the game uses.
 SilentAimSection:AddList({
     text = "Silent Aim Method",
-    selected = "All Methods",
-    tooltip = "Which ray method to use. Mouse.Hit/Target for games that read Mouse.Target or Mouse.Hit.",
+    selected = "Raycast",
+    tooltip = "Which ray method to use. Raycast = Universal default. Mouse.Hit/Target for games that read Mouse.Target or Mouse.Hit.",
     values = {
         "All Methods",
         "Namecall (Universal)",
@@ -1185,7 +1182,7 @@ SilentAimSection:AddSlider({
     min = 50,
     max = 500,
     increment = 1,
-    default = 50,
+    default = 130,
     suffix = "px",
     flag = "SilentFOVSize",
     callback = function(value)
@@ -1217,9 +1214,9 @@ SilentAimSection:AddList({
 SilentAimSection:AddSlider({
     text = "Manual Prediction",
     min = 0.01,
-    max = 0.5,
-    increment = 0.01,
-    default = 0.1,
+    max = 1,
+    increment = 0.005,
+    default = 0.165,
     flag = "SilentManualPrediction"
 })
 
@@ -1332,8 +1329,7 @@ local function applyGetMouseLocationHooks()
                     if CalculateChance(flags["SilentHitChance"] or 100) then
                         local HitPart = getClosestPlayer()
                         if HitPart then
-                            local targetPos = applySilentPrediction(HitPart)
-                            local Vec3, OnScreen = WorldToViewportPoint(Camera, targetPos)
+                            local Vec3, OnScreen = WorldToViewportPoint(Camera, HitPart.Position)
                             if OnScreen and Vec3 then
                                 return Vector2.new(Vec3.X, Vec3.Y)
                             end
@@ -1411,6 +1407,7 @@ local function applyNamecallHooks()
         mt.__namecall = newcclosure and newcclosure(function(self, ...)
             local method = getnamecallmethod and getnamecallmethod()
             local args = {...}
+            if checkcaller and checkcaller() then return oldNamecall(self, ...) end
             local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
             local silentMethod = library and library.flags and library.flags["SilentMethod"]
             local useNamecall = (silentMethod == "Namecall (Universal)" or silentMethod == "All Methods")
@@ -1421,7 +1418,7 @@ local function applyNamecallHooks()
                         if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
                             local hitPart = getClosestPlayer()
                             if hitPart then
-                                direction = getDirection(origin, applySilentPrediction(hitPart))
+                                direction = getDirection(origin, hitPart.Position)
                                 return oldNamecall(self, origin, direction, raycastParams)
                             end
                         end
@@ -1432,7 +1429,7 @@ local function applyNamecallHooks()
                         if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
                             local hitPart = getClosestPlayer()
                             if hitPart then
-                                direction = getDirection(origin, applySilentPrediction(hitPart))
+                                direction = getDirection(origin, hitPart.Position)
                                 return oldNamecall(self, origin, direction, ignoreList)
                             end
                         end
@@ -1443,7 +1440,7 @@ local function applyNamecallHooks()
                         if ray and (ray.Origin and ray.Direction) then
                             local hitPart = getClosestPlayer()
                             if hitPart then
-                                local newRay = Ray.new(ray.Origin, getDirection(ray.Origin, applySilentPrediction(hitPart)))
+                                local newRay = Ray.new(ray.Origin, getDirection(ray.Origin, hitPart.Position))
                                 args[1] = newRay
                                 return oldNamecall(self, table.unpack(args))
                             end
@@ -1454,8 +1451,7 @@ local function applyNamecallHooks()
                         local hitPart = getClosestPlayer()
                         if hitPart then
                             local origin = (self.CFrame and self.CFrame.Position) or Camera.CFrame.Position
-                            local targetPos = applySilentPrediction(hitPart)
-                            local dir = (targetPos - origin).Unit * 10000
+                            local dir = getDirection(origin, hitPart.Position)
                             return Ray.new(origin, dir)
                         end
                     end
@@ -1465,6 +1461,7 @@ local function applyNamecallHooks()
         end) or function(self, ...)
             local method = getnamecallmethod and getnamecallmethod()
             local args = {...}
+            if checkcaller and checkcaller() then return oldNamecall(self, ...) end
             local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
             local silentMethod = library and library.flags and library.flags["SilentMethod"]
             local useNamecall = (silentMethod == "Namecall (Universal)" or silentMethod == "All Methods")
@@ -1475,7 +1472,7 @@ local function applyNamecallHooks()
                         if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
                             local hitPart = getClosestPlayer()
                             if hitPart then
-                                direction = getDirection(origin, applySilentPrediction(hitPart))
+                                direction = getDirection(origin, hitPart.Position)
                                 return oldNamecall(self, origin, direction, raycastParams)
                             end
                         end
@@ -1486,7 +1483,7 @@ local function applyNamecallHooks()
                         if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
                             local hitPart = getClosestPlayer()
                             if hitPart then
-                                direction = getDirection(origin, applySilentPrediction(hitPart))
+                                direction = getDirection(origin, hitPart.Position)
                                 return oldNamecall(self, origin, direction, ignoreList)
                             end
                         end
@@ -1497,7 +1494,7 @@ local function applyNamecallHooks()
                         if ray and (ray.Origin and ray.Direction) then
                             local hitPart = getClosestPlayer()
                             if hitPart then
-                                local newRay = Ray.new(ray.Origin, getDirection(ray.Origin, applySilentPrediction(hitPart)))
+                                local newRay = Ray.new(ray.Origin, getDirection(ray.Origin, hitPart.Position))
                                 args[1] = newRay
                                 return oldNamecall(self, table.unpack(args))
                             end
@@ -1508,8 +1505,7 @@ local function applyNamecallHooks()
                         local hitPart = getClosestPlayer()
                         if hitPart then
                             local origin = (self.CFrame and self.CFrame.Position) or Camera.CFrame.Position
-                            local targetPos = applySilentPrediction(hitPart)
-                            local dir = (targetPos - origin).Unit * 10000
+                            local dir = getDirection(origin, hitPart.Position)
                             return Ray.new(origin, dir)
                         end
                     end

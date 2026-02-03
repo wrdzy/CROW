@@ -495,17 +495,19 @@ MiscUtility:AddToggle({
     text = "Force Third Person",
     state = false,
     flag = "ThirdPersonEnabled",
-    tooltip = "Lock camera zoom to this distance (third person)",
+    tooltip = "Lock camera zoom to this distance (third person). Not available in all games.",
     callback = function(state)
         thirdPersonEnabled = state
         if Camera then
-            if state then
-                Camera.CameraMinZoomDistance = thirdPersonDistance
-                Camera.CameraMaxZoomDistance = thirdPersonDistance
-            else
-                Camera.CameraMinZoomDistance = 0.5
-                Camera.CameraMaxZoomDistance = 128
-            end
+            pcall(function()
+                if state then
+                    Camera.CameraMinZoomDistance = thirdPersonDistance
+                    Camera.CameraMaxZoomDistance = thirdPersonDistance
+                else
+                    Camera.CameraMinZoomDistance = 0.5
+                    Camera.CameraMaxZoomDistance = 128
+                end
+            end)
         end
     end
 })
@@ -520,7 +522,9 @@ MiscUtility:AddSlider({
     callback = function(v)
         thirdPersonDistance = v
         if thirdPersonEnabled and Camera then
-            Camera.CameraMaxZoomDistance = v
+            pcall(function()
+                Camera.CameraMaxZoomDistance = v
+            end)
         end
     end
 })
