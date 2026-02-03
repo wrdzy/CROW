@@ -904,6 +904,7 @@ function library:Unload()
         g.PlayerTab = nil
         g.ESPTab = nil
         g.Aimlock = nil
+        g.MiscTab = nil
         g.WorldTab = nil
         g.AdminTab = nil
     end
@@ -5755,9 +5756,10 @@ local ok, err = pcall(function()
     g.PlayerTab = menu:AddTab('Player', 2)
     g.ESPTab = menu:AddTab('ESP', 3)
     g.Aimlock = menu:AddTab('Aimlock', 4)
-    g.WorldTab = menu:AddTab('World', 5)
+    g.MiscTab = menu:AddTab('Misc', 5)
+    g.WorldTab = menu:AddTab('World', 6)
     if isAdmin then
-        g.AdminTab = menu:AddTab('Admin', 6)
+        g.AdminTab = menu:AddTab('Admin', 7)
     end
     g.CROW = library
     if menu.targetName then library.targetName = menu.targetName end
@@ -5777,6 +5779,7 @@ local ok, err = pcall(function()
         real.PlayerTab = g.PlayerTab
         real.ESPTab = g.ESPTab
         real.Aimlock = g.Aimlock
+        real.MiscTab = g.MiscTab
         real.WorldTab = g.WorldTab
         real.library = library
     end

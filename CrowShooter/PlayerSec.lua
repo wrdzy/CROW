@@ -192,6 +192,9 @@ local states = {
     fovEnabled = false,
     noclipEnabled = false,
     flyEnabled = false,
+    infiniteJumpEnabled = false,
+    spinbotEnabled = false,
+    antiAimEnabled = false,
 }
 
 -- Movement State Tracking
@@ -229,7 +232,7 @@ local function cleanupConnections(connectionType)
 end
 
 -- Forward declarations for toggle functions
-local toggleSpeed, toggleJump, toggleFOV, toggleNoclip, toggleFly
+local toggleSpeed, toggleJump, toggleFOV, toggleNoclip, toggleFly, toggleInfiniteJump, toggleSpinbot, toggleAntiAim
 
 -- Character Setup (called when character spawns or respawns)
 local function setupCharacter(char)
@@ -261,6 +264,9 @@ local function setupCharacter(char)
         if states.jumpEnabled then toggleJump(true) end
         if states.noclipEnabled then toggleNoclip(true) end
         if states.flyEnabled then toggleFly(true) end
+        if states.infiniteJumpEnabled then toggleInfiniteJump(true) end
+        if states.spinbotEnabled then toggleSpinbot(true) end
+        if states.antiAimEnabled then toggleAntiAim(true) end
     end)
 end
 
@@ -876,6 +882,57 @@ flyToggle:AddBind({
     end
 })
 
+-- Infinite Jump: apply upward velocity on every jump input (works in air)
+toggleInfiniteJump = function(state)
+    states.infiniteJumpEnabled = state
+    cleanupConnections("infinite_jump")
+    if not state then return end
+    local conn = UserInputService.JumpRequest:Connect(function()
+        if not states.infiniteJumpEnabled or not character or not humanoid then return end
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        local v = rootPart.AssemblyLinearVelocity or rootPart.Velocity
+        rootPart.AssemblyLinearVelocity = v + Vector3.new(0, jumpValue and jumpValue > 0 and jumpValue * 0.8 or 45, 0)
+    end)
+    trackConnection(conn, "infinite_jump")
+end
+
+-- Spinbot: rotate character around Y axis (degrees per second)
+local spinbotSpeed = 360
+local spinbotLastTick = 0
+toggleSpinbot = function(state)
+    states.spinbotEnabled = state
+    cleanupConnections("spinbot")
+    if not state then return end
+    spinbotLastTick = tick()
+    local conn = RunService.Heartbeat:Connect(function()
+        if not states.spinbotEnabled or not character then return end
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        local now = tick()
+        local dt = math.min(now - spinbotLastTick, 0.05)
+        spinbotLastTick = now
+        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(spinbotSpeed * dt), 0)
+    end)
+    trackConnection(conn, "spinbot")
+end
+
+-- Anti-aim: small random Y rotation jitter to make aim harder
+local antiAimIntensity = 15
+toggleAntiAim = function(state)
+    states.antiAimEnabled = state
+    cleanupConnections("anti_aim")
+    if not state then return end
+    local conn = RunService.Heartbeat:Connect(function()
+        if not states.antiAimEnabled or not character then return end
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+        local jitter = (math.random() - 0.5) * 2 * antiAimIntensity
+        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(jitter), 0)
+    end)
+    trackConnection(conn, "anti_aim")
+end
+
 secplayer:AddBind({
     text = "Fly Up Key",
     tooltip = "Hold to move up while flying",
@@ -934,7 +991,59 @@ fovToggle:AddBind({
     end
 })
 
+local infiniteJumpToggle = secplayer:AddToggle({
+    text = "Infinite Jump",
+    state = false,
+    tooltip = "Jump repeatedly in mid-air",
+    flag = "Toggle_InfiniteJump",
+    callback = function(state)
+        toggleInfiniteJump(state)
+    end
+})
 
+local spinbotToggle = secplayer:AddToggle({
+    text = "Spinbot",
+    state = false,
+    tooltip = "Rotate character around Y axis",
+    flag = "Toggle_Spinbot",
+    callback = function(state)
+        toggleSpinbot(state)
+    end
+})
+secplayer:AddSlider({
+    text = "Spinbot Speed",
+    tooltip = "Degrees per second",
+    flag = "SpinbotSpeed",
+    min = 90,
+    max = 720,
+    increment = 30,
+    default = 360,
+    callback = function(v)
+        spinbotSpeed = v
+    end
+})
+
+local antiAimToggle = secplayer:AddToggle({
+    text = "Anti-Aim",
+    state = false,
+    tooltip = "Random rotation jitter to make aim harder",
+    flag = "Toggle_AntiAim",
+    callback = function(state)
+        toggleAntiAim(state)
+    end
+})
+secplayer:AddSlider({
+    text = "Anti-Aim Intensity",
+    tooltip = "Jitter strength (degrees)",
+    flag = "AntiAimIntensity",
+    min = 5,
+    max = 45,
+    increment = 1,
+    default = 15,
+    callback = function(v)
+        antiAimIntensity = v
+    end
+})
 
 -- Character Customization Section
 local seccharacter = _G.PlayerTab:AddSection("Character Customization", 2)

@@ -50,6 +50,7 @@ shared.library = nil
 shared.PlayerTab = nil
 shared.ESPTab = nil
 shared.Aimlock = nil
+shared.MiscTab = nil
 shared.WorldTab = nil
 shared.AdminTab = nil
 
@@ -115,6 +116,7 @@ local scriptsToLoad = {
     { name = "ESPsec", captureReturn = false },
     { name = "PlayerSec", captureReturn = false },
     { name = "WorldSec", captureReturn = false },
+    { name = "MiscSec", captureReturn = false },
 }
 
 -- Safe mode: UiInnit shows a CROWui window ("SAFE MODE?" + YES/NO) after init, before main window.
