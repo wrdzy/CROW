@@ -15,11 +15,6 @@ if not workspace or not workspace.CurrentCamera then
 end
 local Camera = workspace.CurrentCamera
 
--- Stealth ON before any hooks or UI so hooks pass-through during load (avoids kick while loading)
-if library and type(library.flags) == "table" then
-    library.flags["SilentAimStealth"] = true
-end
-
 -- Drawing Objects
 local AimLockFOVCircle          = Drawing.new("Circle")
 AimLockFOVCircle.Thickness      = 1
@@ -923,7 +918,6 @@ function applyWorkspaceHooks()
         local orig = workspace.Raycast
         if type(orig) == "function" then
             local hooked = hookfunction(orig, function(self, origin, direction, raycastParams)
-                if (library and library.flags and library.flags["SilentAimStealth"] == true) then return (oldRaycast or orig)(self, origin, direction, raycastParams) end
                 pcall(function()
                     local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
@@ -941,7 +935,6 @@ function applyWorkspaceHooks()
         local orig = workspace.FindPartOnRayWithIgnoreList
         if type(orig) == "function" then
             local hooked = hookfunction(orig, function(self, ray, ...)
-                if (library and library.flags and library.flags["SilentAimStealth"] == true) then return (oldFindPartOnRayWithIgnoreList or orig)(self, ray, ...) end
                 pcall(function()
                     local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
@@ -959,7 +952,6 @@ function applyWorkspaceHooks()
         local orig = workspace.FindPartOnRayWithWhitelist
         if type(orig) == "function" then
             local hooked = hookfunction(orig, function(self, ray, ...)
-                if (library and library.flags and library.flags["SilentAimStealth"] == true) then return (oldFindPartOnRayWithWhitelist or orig)(self, ray, ...) end
                 pcall(function()
                     local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
@@ -977,7 +969,6 @@ function applyWorkspaceHooks()
         local orig = workspace.FindPartOnRay
         if type(orig) == "function" then
             local hooked = hookfunction(orig, function(self, ray, ...)
-                if (library and library.flags and library.flags["SilentAimStealth"] == true) then return (oldFindPartOnRay or orig)(self, ray, ...) end
                 pcall(function()
                     local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
@@ -996,7 +987,6 @@ function applyWorkspaceHooks()
         local orig = workspace.RaycastWithIgnoreList
         if type(orig) == "function" then
             local hooked = hookfunction(orig, function(self, origin, direction, ignoreList)
-                if (library and library.flags and library.flags["SilentAimStealth"] == true) then return (oldRaycastWithIgnoreList or orig)(self, origin, direction, ignoreList) end
                 pcall(function()
                     local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
@@ -1025,7 +1015,6 @@ function applyCameraHooks()
         local orig = cam.ScreenPointToRay
         if type(orig) == "function" then
             local hooked = hookfunction(orig, function(self, x, y)
-                if (library and library.flags and library.flags["SilentAimStealth"] == true) then return (oldScreenPointToRay or orig)(self, x, y) end
                 pcall(function()
                     local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
@@ -1048,7 +1037,6 @@ function applyCameraHooks()
         local orig = cam.ViewportPointToRay
         if type(orig) == "function" then
             local hooked = hookfunction(orig, function(self, x, y)
-                if (library and library.flags and library.flags["SilentAimStealth"] == true) then return (oldViewportPointToRay or orig)(self, x, y) end
                 pcall(function()
                     local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
                     local silentMethod = library and library.flags and library.flags["SilentMethod"]
@@ -1147,31 +1135,6 @@ SilentAimSection:AddToggle({
     end
 })
 
-local stealthToggle = SilentAimSection:AddToggle({
-    text = "Stealth (anti-cheat)",
-    state = true,
-    default = true,
-    flag = "SilentAimStealth",
-    tooltip = "ON = only GetMouseLocation redirects (less detectable). OFF = all ray hooks redirect.",
-    callback = function(state)
-        local lib = library
-        if lib and lib.flags then
-            lib.flags["SilentAimStealth"] = state
-        end
-        CachedClosestPlayer = nil
-    end
-})
--- Force stealth on by default (in case config load overrides)
-do
-    local lib = library
-    if lib and lib.flags then
-        lib.flags["SilentAimStealth"] = true
-    end
-    if stealthToggle and type(stealthToggle.SetState) == "function" then
-        pcall(stealthToggle.SetState, stealthToggle, true, true)
-    end
-end
-
 SilentAimSection:AddList({
     text = "Target Body Parts",
     selected = "Head",
@@ -1183,12 +1146,12 @@ SilentAimSection:AddList({
     end
 })
 
--- All Methods = try every hooked ray method (best compatibility). Stealth ON = only GetMouseLocation.
+-- All Methods = try every hooked ray method (best compatibility).
 -- Namecall (Universal) = single __namecall hook catches any Ray method the game uses.
 SilentAimSection:AddList({
     text = "Silent Aim Method",
     selected = "All Methods",
-    tooltip = "Which ray method to use. All Methods tries all; Namecall (Universal) uses one hook for any Ray API; Stealth ON uses only GetMouseLocation.",
+    tooltip = "Which ray method to use. All Methods tries all; Namecall (Universal) uses one hook for any Ray API.",
     values = {
         "All Methods",
         "Namecall (Universal)",
@@ -1404,9 +1367,8 @@ local function applyNamecallHooks()
             local args = {...}
             local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
             local silentMethod = library and library.flags and library.flags["SilentMethod"]
-            local stealthOn = (library and library.flags) and (library.flags["SilentAimStealth"] == true)
             local useNamecall = (silentMethod == "Namecall (Universal)" or silentMethod == "All Methods")
-            if not stealthOn and silentAimActive and silentMethod and CalculateChance(library.flags["SilentHitChance"] or 100) then
+            if silentAimActive and silentMethod and CalculateChance(library.flags["SilentHitChance"] or 100) then
                 if method == "Raycast" and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
                     if silentMethod == "Raycast" or useNamecall then
                         local origin, direction, raycastParams = args[1], args[2], args[3]
@@ -1459,9 +1421,8 @@ local function applyNamecallHooks()
             local args = {...}
             local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
             local silentMethod = library and library.flags and library.flags["SilentMethod"]
-            local stealthOn = (library and library.flags) and (library.flags["SilentAimStealth"] == true)
             local useNamecall = (silentMethod == "Namecall (Universal)" or silentMethod == "All Methods")
-            if not stealthOn and silentAimActive and silentMethod and CalculateChance(library.flags["SilentHitChance"] or 100) then
+            if silentAimActive and silentMethod and CalculateChance(library.flags["SilentHitChance"] or 100) then
                 if method == "Raycast" and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
                     if silentMethod == "Raycast" or useNamecall then
                         local origin, direction, raycastParams = args[1], args[2], args[3]

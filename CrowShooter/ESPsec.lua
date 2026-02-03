@@ -724,8 +724,8 @@ RunService.RenderStepped:Connect(function(delta)
         local boxW, boxH = 50 * scale, 100 * scale
         local boxX, boxY = pos.X - boxW / 2, pos.Y - boxH / 2
 
-        -- Color by enemy list only (no teams)
-        local color = (EnemyList[player] and ESPSettings.EnemyColor) or ESPSettings.AllyColor
+        -- When team check is on we only show non-teammates; use enemy color (no ally color). Otherwise color by enemy list.
+        local color = (flags["ESPTeamCheck"] and ESPSettings.EnemyColor) or (EnemyList[player] and ESPSettings.EnemyColor) or ESPSettings.AllyColor
 
         if flags["ESPBox"] and data.Box then
             data.Box.Position = Vector2.new(boxX, boxY)

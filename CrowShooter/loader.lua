@@ -2,7 +2,7 @@
     Run: loadstring(game:HttpGet("https://raw.githubusercontent.com/wrdzy/CROW/main/CrowShooter/loader.lua"))()
     Full docs: see README.md (admins, config, rebrand, tabs).
     Load order: BlacklistedPlayers → signal → UiInnit → AdminPanel → AimSec → ESPsec → PlayerSec → WorldSec.
-    AC bypass: _G.CROW_bypass backs up hook APIs before scripts load. Silent aim: no hooks until enabled; Stealth on by default.
+    AC bypass: _G.CROW_bypass backs up hook APIs before scripts load. Silent aim: no hooks until enabled.
     Debug: _G.CROW_DEBUG = true for load logs. ]]
 
 local function getLoaderEnv()

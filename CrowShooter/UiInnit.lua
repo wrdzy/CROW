@@ -2581,7 +2581,7 @@ end
                     end)
 
                     local ySize, padding = 15, 0;
-                    for i,option in next, self.options do
+                    for i, option in ipairs(self.options) do
                         option.objects.holder.Visible = option.enabled
                         if option.enabled then
                             option.objects.holder.Position = newUDim2(0,0,0,ySize-15);

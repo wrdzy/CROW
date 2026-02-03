@@ -582,14 +582,13 @@ toggleFOV = function(state)
     end
 end
 
--- Noclip: leave HumanoidRootPart alone; only toggle limbs/accessories. Store/restore original CanCollide so turning noclip off does not change parts that had collision off.
+-- Noclip: set CanCollide on all character BaseParts (R6 and R15). Store/restore original so turning off doesn't change parts that had collision off.
 local noclipOriginalCollide = {}
 
 local function setNoclipPartsCollide(collide)
     if not character or not character.Parent then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
     for _, part in pairs(character:GetDescendants()) do
-        if part:IsA("BasePart") and part ~= hrp then
+        if part:IsA("BasePart") then
             if not collide then
                 if noclipOriginalCollide[part] == nil then
                     noclipOriginalCollide[part] = part.CanCollide
@@ -620,7 +619,7 @@ toggleNoclip = function(state)
         end)
         trackConnection(connection, "noclip")
         local descendantConnection = character.DescendantAdded:Connect(function(descendant)
-            if states.noclipEnabled and descendant:IsA("BasePart") and descendant ~= character:FindFirstChild("HumanoidRootPart") then
+            if states.noclipEnabled and descendant:IsA("BasePart") then
                 if noclipOriginalCollide[descendant] == nil then
                     noclipOriginalCollide[descendant] = descendant.CanCollide
                 end
