@@ -725,11 +725,13 @@ local ExpectedArguments = {
     }
 }
 
--- Target parts mapping for multi-selection
+-- Target parts mapping (Universal: Head, HumanoidRootPart, Random)
+local ValidTargetParts = {"Head", "HumanoidRootPart"}
 local TARGET_PARTS = {
     Head = {"Head"},
     Torso = {"HumanoidRootPart"},
-    Legs = {"Left Leg", "LeftUpperLeg"}
+    Legs = {"Left Leg", "LeftUpperLeg"},
+    Random = {"Head", "HumanoidRootPart"}
 }
 
 -- Utility Functions
@@ -776,16 +778,19 @@ local function IsPlayerVisible(Player)
     local PlayerCharacter = Player.Character
     local LocalPlayerCharacter = LocalPlayer.Character
     
-    if not (PlayerCharacter or LocalPlayerCharacter) then return end 
+    if not (PlayerCharacter or LocalPlayerCharacter) then return false end
     
-    local PlayerRoot = FindFirstChild(PlayerCharacter, "Head") or FindFirstChild(PlayerCharacter, "HumanoidRootPart")
+    -- Universal: use target part or HumanoidRootPart for ray check
+    local selectedParts = (library and library.flags and library.flags["SilentTargetParts"]) or {"Torso"}
+    local partName = (selectedParts[1] == "Random" and "HumanoidRootPart") or (TARGET_PARTS[selectedParts[1]] and TARGET_PARTS[selectedParts[1]][1]) or "HumanoidRootPart"
+    local PlayerRoot = FindFirstChild(PlayerCharacter, partName) or FindFirstChild(PlayerCharacter, "HumanoidRootPart")
     
-    if not PlayerRoot then return end 
+    if not PlayerRoot then return false end
     
     local CastPoints, IgnoreList = {PlayerRoot.Position, LocalPlayerCharacter, PlayerCharacter}, {LocalPlayerCharacter, PlayerCharacter}
     local ObscuringObjects = #GetPartsObscuringTarget(Camera, CastPoints, IgnoreList)
     
-    return ((ObscuringObjects == 0 and true) or (ObscuringObjects > 0 and false))
+    return ObscuringObjects == 0
 end
 
 -- Function to get selected target parts
@@ -810,11 +815,15 @@ local function getSelectedTargetParts()
     return selectedParts
 end
 
--- Function to get random target part from character
+-- Function to get target part from character (Universal: Random = Head or HumanoidRootPart at random)
 local function getTargetPart(Character)
+    local selectedBodyParts = (library and library.flags and library.flags["SilentTargetParts"]) or {"Torso"}
+    -- Random = pick Head or HumanoidRootPart at random per Universal
+    if selectedBodyParts[1] == "Random" then
+        local partName = ValidTargetParts[math.random(1, #ValidTargetParts)]
+        return FindFirstChild(Character, partName)
+    end
     local selectedParts = getSelectedTargetParts()
-    
-    -- Try to find available parts from selected ones
     local availableParts = {}
     for _, partName in ipairs(selectedParts) do
         local part = FindFirstChild(Character, partName)
@@ -822,13 +831,10 @@ local function getTargetPart(Character)
             table.insert(availableParts, part)
         end
     end
-    
-    -- Return random available part or fallback to HumanoidRootPart
     if #availableParts > 0 then
         return availableParts[math.random(1, #availableParts)]
-    else
-        return FindFirstChild(Character, "HumanoidRootPart")
     end
+    return FindFirstChild(Character, "HumanoidRootPart")
 end
 
 -- Apply silent aim prediction (simplified - removed auto prediction)
@@ -905,6 +911,9 @@ local function updateFOVVisibility()
     local isActive = library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
     if fov_circle then fov_circle.Visible = isActive end
 end
+
+-- Forward declare so toggle callback (created below) always has a non-nil reference
+local applyAllSilentAimHooks
 
 -- Apply workspace hooks at load so silent aim works; each hook in pcall so one failure doesn't block others
 local oldRaycast, oldFindPartOnRayWithIgnoreList, oldFindPartOnRayWithWhitelist, oldFindPartOnRay, oldRaycastWithIgnoreList
@@ -1065,13 +1074,15 @@ local silentAimToggle = SilentAimSection:AddToggle({
     flag = "SilentAimEnabled",
     tooltip = "Enable or disable silent aim",
     callback = function(state)
-        local lib = library
-        if not lib or not lib.flags then return end
-        lib.flags["SilentAimEnabled"] = state
-        lib.flags["SilentAimActive"] = state
-        CachedClosestPlayer = nil
-        updateFOVVisibility()
-        if state then applyAllSilentAimHooks() end
+        pcall(function()
+            local lib = library
+            if not lib or not lib.flags then return end
+            lib.flags["SilentAimEnabled"] = state
+            lib.flags["SilentAimActive"] = state
+            CachedClosestPlayer = nil
+            updateFOVVisibility()
+            if state and type(applyAllSilentAimHooks) == "function" then applyAllSilentAimHooks() end
+        end)
     end
 })
 silentAimToggle:AddBind({
@@ -1081,17 +1092,18 @@ silentAimToggle:AddBind({
     flag = "SilentAimToggleKey",
     tooltip = "Toggle Silent Aim on/off (syncs with toggle above)",
     callback = function(state)
-        local lib = library
-        if not lib or not lib.flags then return end
-        lib.flags["SilentAimEnabled"] = state
-        lib.flags["SilentAimActive"] = state
-        CachedClosestPlayer = nil
-        updateFOVVisibility()
-        if state then applyAllSilentAimHooks() end
-        -- Sync toggle UI so it matches keybind state (nocallback = true to avoid firing toggle callback again)
-        if silentAimToggle and type(silentAimToggle.SetState) == "function" then
-            pcall(silentAimToggle.SetState, silentAimToggle, state, true)
-        end
+        pcall(function()
+            local lib = library
+            if not lib or not lib.flags then return end
+            lib.flags["SilentAimEnabled"] = state
+            lib.flags["SilentAimActive"] = state
+            CachedClosestPlayer = nil
+            updateFOVVisibility()
+            if state and type(applyAllSilentAimHooks) == "function" then applyAllSilentAimHooks() end
+            if silentAimToggle and type(silentAimToggle.SetState) == "function" then
+                silentAimToggle.SetState(silentAimToggle, state, true)
+            end
+        end)
     end
 })
 
@@ -1136,7 +1148,7 @@ SilentAimSection:AddList({
     text = "Target Body Parts",
     selected = "Torso",
     multi = true,
-    values = {"Head", "Torso", "Legs"},
+    values = {"Head", "Torso", "Legs", "Random"},
     flag = "SilentTargetParts",
     callback = function()
         CachedClosestPlayer = nil
@@ -1390,7 +1402,7 @@ local function applyMouseHitTargetHook()
     end)
 end
 
--- __namecall hook: intercept Instance method calls (workspace:Raycast, Camera:ScreenPointToRay, etc.) so silent aim works when games call these via :
+-- __namecall hook (Universal Silent Aim - workspace only, ValidateArguments)
 local namecallHooksApplied = false
 local function applyNamecallHooks()
     if namecallHooksApplied then return end
@@ -1404,126 +1416,67 @@ local function applyNamecallHooks()
         local oldNamecall = mt.__namecall
         if type(oldNamecall) ~= "function" then return end
         if setreadonly then pcall(function() setreadonly(mt, false) end) end
-        mt.__namecall = newcclosure and newcclosure(function(self, ...)
-            local method = getnamecallmethod and getnamecallmethod()
-            local args = {...}
-            if checkcaller and checkcaller() then return oldNamecall(self, ...) end
-            local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
-            local silentMethod = library and library.flags and library.flags["SilentMethod"]
-            local useNamecall = (silentMethod == "Namecall (Universal)" or silentMethod == "All Methods")
-            if silentAimActive and silentMethod and CalculateChance(library.flags["SilentHitChance"] or 100) then
-                if method == "Raycast" and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
-                    if silentMethod == "Raycast" or useNamecall then
-                        local origin, direction, raycastParams = args[1], args[2], args[3]
-                        if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
-                            local hitPart = getClosestPlayer()
-                            if hitPart then
-                                direction = getDirection(origin, hitPart.Position)
-                                return oldNamecall(self, origin, direction, raycastParams)
-                            end
+        local function namecallHook(self, ...)
+            local Method = getnamecallmethod and getnamecallmethod()
+            local Arguments = {...}
+            local chance = CalculateChance(library and library.flags and library.flags["SilentHitChance"] or 100)
+            if library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false) and self == workspace and checkcaller and not checkcaller() and chance then
+                local silentMethod = library.flags["SilentMethod"]
+                if Method == "FindPartOnRayWithIgnoreList" and (silentMethod == "FindPartOnRayWithIgnoreList" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments(Arguments, ExpectedArguments.FindPartOnRayWithIgnoreList) then
+                        local A_Ray = Arguments[2]
+                        local HitPart = getClosestPlayer()
+                        if HitPart then
+                            local Origin = A_Ray.Origin
+                            local Direction = getDirection(Origin, HitPart.Position)
+                            Arguments[2] = Ray.new(Origin, Direction)
+                            return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
-                elseif method == "RaycastWithIgnoreList" and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
-                    if silentMethod == "RaycastWithIgnoreList" or useNamecall then
-                        local origin, direction, ignoreList = args[1], args[2], args[3]
-                        if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
-                            local hitPart = getClosestPlayer()
-                            if hitPart then
-                                direction = getDirection(origin, hitPart.Position)
-                                return oldNamecall(self, origin, direction, ignoreList)
-                            end
+                elseif Method == "FindPartOnRayWithWhitelist" and (silentMethod == "FindPartOnRayWithWhitelist" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments(Arguments, ExpectedArguments.FindPartOnRayWithWhitelist) then
+                        local A_Ray = Arguments[2]
+                        local HitPart = getClosestPlayer()
+                        if HitPart then
+                            local Origin = A_Ray.Origin
+                            local Direction = getDirection(Origin, HitPart.Position)
+                            Arguments[2] = Ray.new(Origin, Direction)
+                            return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
-                elseif (method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" or method == "FindPartOnRay") and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
-                    if silentMethod == method or useNamecall then
-                        local ray = args[1]
-                        if ray and (ray.Origin and ray.Direction) then
-                            local hitPart = getClosestPlayer()
-                            if hitPart then
-                                local newRay = Ray.new(ray.Origin, getDirection(ray.Origin, hitPart.Position))
-                                args[1] = newRay
-                                return oldNamecall(self, table.unpack(args))
-                            end
+                elseif (Method == "FindPartOnRay" or Method == "findPartOnRay") and (silentMethod == "FindPartOnRay" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments(Arguments, ExpectedArguments.FindPartOnRay) then
+                        local A_Ray = Arguments[2]
+                        local HitPart = getClosestPlayer()
+                        if HitPart then
+                            local Origin = A_Ray.Origin
+                            local Direction = getDirection(Origin, HitPart.Position)
+                            Arguments[2] = Ray.new(Origin, Direction)
+                            return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
-                elseif (method == "ScreenPointToRay" or method == "ViewportPointToRay") and (self == Camera or self == workspace.CurrentCamera) then
-                    if silentMethod == "ScreenPointToRay" or silentMethod == "ViewportPointToRay" or useNamecall then
-                        local hitPart = getClosestPlayer()
-                        if hitPart then
-                            local origin = (self.CFrame and self.CFrame.Position) or Camera.CFrame.Position
-                            local dir = getDirection(origin, hitPart.Position)
-                            return Ray.new(origin, dir)
-                        end
-                    end
-                end
-            end
-            return oldNamecall(self, ...)
-        end) or function(self, ...)
-            local method = getnamecallmethod and getnamecallmethod()
-            local args = {...}
-            if checkcaller and checkcaller() then return oldNamecall(self, ...) end
-            local silentAimActive = library and library.flags and library.flags["SilentAimEnabled"] and (library.flags["SilentAimActive"] ~= false)
-            local silentMethod = library and library.flags and library.flags["SilentMethod"]
-            local useNamecall = (silentMethod == "Namecall (Universal)" or silentMethod == "All Methods")
-            if silentAimActive and silentMethod and CalculateChance(library.flags["SilentHitChance"] or 100) then
-                if method == "Raycast" and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
-                    if silentMethod == "Raycast" or useNamecall then
-                        local origin, direction, raycastParams = args[1], args[2], args[3]
-                        if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
-                            local hitPart = getClosestPlayer()
-                            if hitPart then
-                                direction = getDirection(origin, hitPart.Position)
-                                return oldNamecall(self, origin, direction, raycastParams)
-                            end
-                        end
-                    end
-                elseif method == "RaycastWithIgnoreList" and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
-                    if silentMethod == "RaycastWithIgnoreList" or useNamecall then
-                        local origin, direction, ignoreList = args[1], args[2], args[3]
-                        if typeof(origin) == "Vector3" and typeof(direction) == "Vector3" then
-                            local hitPart = getClosestPlayer()
-                            if hitPart then
-                                direction = getDirection(origin, hitPart.Position)
-                                return oldNamecall(self, origin, direction, ignoreList)
-                            end
-                        end
-                    end
-                elseif (method == "FindPartOnRayWithIgnoreList" or method == "FindPartOnRayWithWhitelist" or method == "FindPartOnRay") and (self == workspace or (self.IsDescendantOf and self:IsDescendantOf(workspace))) then
-                    if silentMethod == method or useNamecall then
-                        local ray = args[1]
-                        if ray and (ray.Origin and ray.Direction) then
-                            local hitPart = getClosestPlayer()
-                            if hitPart then
-                                local newRay = Ray.new(ray.Origin, getDirection(ray.Origin, hitPart.Position))
-                                args[1] = newRay
-                                return oldNamecall(self, table.unpack(args))
-                            end
-                        end
-                    end
-                elseif (method == "ScreenPointToRay" or method == "ViewportPointToRay") and (self == Camera or self == workspace.CurrentCamera) then
-                    if silentMethod == "ScreenPointToRay" or silentMethod == "ViewportPointToRay" or useNamecall then
-                        local hitPart = getClosestPlayer()
-                        if hitPart then
-                            local origin = (self.CFrame and self.CFrame.Position) or Camera.CFrame.Position
-                            local dir = getDirection(origin, hitPart.Position)
-                            return Ray.new(origin, dir)
+                elseif Method == "Raycast" and (silentMethod == "Raycast" or silentMethod == "Namecall (Universal)" or silentMethod == "All Methods") then
+                    if ValidateArguments(Arguments, ExpectedArguments.Raycast) then
+                        local A_Origin = Arguments[2]
+                        local HitPart = getClosestPlayer()
+                        if HitPart then
+                            Arguments[3] = getDirection(A_Origin, HitPart.Position)
+                            return oldNamecall(self, table.unpack(Arguments))
                         end
                     end
                 end
             end
             return oldNamecall(self, ...)
         end
+        mt.__namecall = newcclosure and newcclosure(namecallHook) or namecallHook
         if setreadonly then pcall(function() setreadonly(mt, true) end) end
     end)
 end
 
--- Single entry point: apply all silent aim hooks when user enables (no hooks at load = no detection)
-local function applyAllSilentAimHooks()
-    pcall(applyGetMouseLocationHooks)
+-- Single entry point: apply silent aim hooks when user enables (Universal: __namecall + Mouse __index only)
+applyAllSilentAimHooks = function()
     pcall(applyMouseHitTargetHook)
-    pcall(applyWorkspaceHooks)
-    pcall(applyCameraHooks)
     pcall(applyNamecallHooks)
 end
 
--- No __newindex hook: avoids indexInstance detector (Error 267). Camera.CFrame method disabled to keep Instance metatable untouched.
+-- No __newindex hook: avoids indexInstance detector (Error 267).
