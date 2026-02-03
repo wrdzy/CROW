@@ -582,15 +582,31 @@ toggleFOV = function(state)
     end
 end
 
--- Noclip: same as commented "other" script — leave HumanoidRootPart alone (game uses it); only toggle limbs/accessories
+-- Noclip: leave HumanoidRootPart alone; only toggle limbs/accessories. Store/restore original CanCollide so turning noclip off does not change parts that had collision off.
+local noclipOriginalCollide = {}
+
 local function setNoclipPartsCollide(collide)
     if not character or not character.Parent then return end
     local hrp = character:FindFirstChild("HumanoidRootPart")
     for _, part in pairs(character:GetDescendants()) do
         if part:IsA("BasePart") and part ~= hrp then
-            part.CanCollide = collide
+            if not collide then
+                if noclipOriginalCollide[part] == nil then
+                    noclipOriginalCollide[part] = part.CanCollide
+                end
+                part.CanCollide = false
+            end
         end
     end
+end
+
+local function restoreNoclipPartsCollide()
+    for part, original in pairs(noclipOriginalCollide) do
+        if part.Parent then
+            part.CanCollide = original
+        end
+    end
+    table.clear(noclipOriginalCollide)
 end
 
 toggleNoclip = function(state)
@@ -605,12 +621,15 @@ toggleNoclip = function(state)
         trackConnection(connection, "noclip")
         local descendantConnection = character.DescendantAdded:Connect(function(descendant)
             if states.noclipEnabled and descendant:IsA("BasePart") and descendant ~= character:FindFirstChild("HumanoidRootPart") then
+                if noclipOriginalCollide[descendant] == nil then
+                    noclipOriginalCollide[descendant] = descendant.CanCollide
+                end
                 descendant.CanCollide = false
             end
         end)
         trackConnection(descendantConnection, "noclip")
     else
-        setNoclipPartsCollide(true)
+        restoreNoclipPartsCollide()
     end
 end
 
@@ -702,7 +721,7 @@ local function cleanupStats()
     end
 
     if states.noclipEnabled and character then
-        setNoclipPartsCollide(true)
+        restoreNoclipPartsCollide()
     end
 
     for key, _ in pairs(states) do
