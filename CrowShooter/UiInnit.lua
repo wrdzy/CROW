@@ -1000,7 +1000,9 @@ function library:init()
                 if option and option.class then
                     local noApply = worldNoApply[flag]
                     if option.class == 'toggle' then
-                        option:SetState(value == nil and false or (value == 1 or value == true), noApply);
+                        local bool = (value == 1 or value == true)
+                        library.flags[flag] = bool
+                        option:SetState(bool, noApply);
                     elseif option.class == 'slider' then
                         local v = value
                         if type(v) ~= "number" then v = option.default or option.min end
@@ -1076,24 +1078,26 @@ function library:SaveConfig(name)
         local cfg = {};
         for flag,option in next, self.options do
             if not option or not option.class then continue end
+            -- Use option.flag as config key when present so saved keys always match what LoadConfig looks up
+            local cfgKey = (type(option.flag) == "string" and option.flag ~= "") and option.flag or flag;
             if option.class == 'toggle' then
-                local state = (self.flags and self.flags[flag] ~= nil) and self.flags[flag] or option.state;
-                cfg[flag] = state and 1 or 0;
+                local state = (self.flags and self.flags[cfgKey] ~= nil) and self.flags[cfgKey] or option.state;
+                cfg[cfgKey] = state and 1 or 0;
             elseif option.class == 'slider' then
-                cfg[flag] = option.value;
+                cfg[cfgKey] = option.value;
             elseif option.class == 'bind' then
                 local b = option.bind;
-                cfg[flag] = (type(b) == "userdata" and b and b.Name) or "none";
+                cfg[cfgKey] = (type(b) == "userdata" and b and b.Name) or "none";
             elseif option.class == 'color' then
                 local c = option.color;
                 local r = (c and (c.R or c.r)) or 0;
                 local g = (c and (c.G or c.g)) or 0;
                 local b = (c and (c.B or c.b)) or 0;
-                cfg[flag] = { r, g, b, option.trans or 0 };
+                cfg[cfgKey] = { r, g, b, option.trans or 0 };
             elseif option.class == 'list' then
-                cfg[flag] = option.selected;
+                cfg[cfgKey] = option.selected;
             elseif option.class == 'box' then
-                cfg[flag] = option.input or "";
+                cfg[cfgKey] = option.input or "";
             end
         end
         writefile(self.cheatname..'/'..self.configname..'/'..name..self.fileext, http:JSONEncode(cfg));
