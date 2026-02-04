@@ -991,17 +991,18 @@ function library:init()
         end
 
         if next(decodedCfg) == nil then
-            for _, option in next, library.options do
+            for _, option in next, self.options do
                 applyDefault(option)
             end
         else
+            -- First pass: apply by config key (same as before)
             for flag, value in next, decodedCfg do
-                local option = library.options[flag]
+                local option = self.options[flag]
                 if option and option.class then
                     local noApply = worldNoApply[flag]
                     if option.class == 'toggle' then
                         local bool = (value == 1 or value == true)
-                        library.flags[flag] = bool
+                        self.flags[flag] = bool
                         option:SetState(bool, noApply);
                     elseif option.class == 'slider' then
                         local v = value
@@ -1031,6 +1032,17 @@ function library:init()
                         option:Select(v, true)
                     elseif option.class == 'box' then
                         option:SetInput(value == nil and (option.default or '') or tostring(value))
+                    end
+                end
+            end
+            -- Second pass: apply toggles by option.flag so every registered toggle gets config state (handles key/table quirks)
+            for optKey, option in next, self.options do
+                if option and option.class == 'toggle' and type(option.flag) == 'string' and option.flag ~= '' then
+                    local value = decodedCfg[option.flag]
+                    if value ~= nil then
+                        local bool = (value == 1 or value == true)
+                        self.flags[option.flag] = bool
+                        option:SetState(bool, worldNoApply[option.flag])
                     end
                 end
             end
