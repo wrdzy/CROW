@@ -1170,7 +1170,8 @@ end
         utility:Instance('ImageButton', {
             Parent = sg,
             Visible = true,
-            Modal = true,
+            Modal = false,
+            Active = false,
             Size = UDim2.new(1,0,1,0),
             ZIndex = 9999999999,
             Transparency = 1;
@@ -5916,8 +5917,8 @@ local ok, err = pcall(function()
         _G.userId = localplayer.UserId
     end
     g.PlayerTab = menu:AddTab('Player', 2)
-    g.ESPTab = menu:AddTab('ESP', 3)
-    g.Aimlock = menu:AddTab('Aimlock', 4)
+    g.Aimlock = menu:AddTab('Aimlock', 3)
+    g.ESPTab = menu:AddTab('ESP', 4)
     g.MiscTab = menu:AddTab('Misc', 5)
     g.WorldTab = menu:AddTab('World', 6)
     if isAdmin then
