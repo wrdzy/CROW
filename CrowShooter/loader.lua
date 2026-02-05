@@ -235,33 +235,7 @@ pcall(function()
     end
 end)
 
--- Re-execute CROW after teleport when executor provides queue_on_teleport (general API).
--- Queued script must wait for game load + short delay so HttpGet and loader run in a ready session.
-pcall(function()
-    local queueOnTeleport = type(queue_on_teleport) == "function" and queue_on_teleport
-    if not queueOnTeleport then return end
-    local lp = game:GetService("Players").LocalPlayer
-    if not lp or not lp.OnTeleport then return end
-    local loaderUrl = baseUrl .. "loader.lua"
-    local escapedUrl = loaderUrl:gsub("\\", "\\\\"):gsub('"', '\\"')
-    -- Run in new session: wait for game load, short delay, then fetch and run loader (loader re-registers for next teleport).
-    local code = [[
-(function()
-    if not game:IsLoaded() then game.Loaded:Wait() end
-    if task.wait then task.wait(1) else wait(1) end
-    local ok, err = pcall(function()
-        loadstring(game:HttpGet("]] .. escapedUrl .. [["))()
-    end)
-    if not ok and warn then warn("[CROW] Persistence load failed: " .. tostring(err)) end
-end)()
-]]
-    lp.OnTeleport:Connect(function(state)
-        if state == Enum.TeleportState.Started and shared.CROW_ScriptPersistenceEnabled ~= false then
-            queueOnTeleport(code)
-        end
-    end)
-    debugLog("Queue-on-teleport registered: CROW will re-load after server teleport (toggled by Script Persistence).")
-end)
+-- Script persistence (save loader to file + queue_on_teleport) is set up in UiInnit after UI/config is ready.
 
 -- No metatable locking: setreadonly on game/workspace can trigger indexInstance detector (Error 267). Instance metatable left untouched.
 

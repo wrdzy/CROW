@@ -5543,6 +5543,77 @@ end
 
 end
 
+-- Script persistence: save loader to file and register queue_on_teleport so CROW re-loads after teleport/server switch.
+-- Called from CreateSettingsTab after UI (and Script Persistence toggle) is ready; respects config/toggle state.
+function library:SetupScriptPersistence()
+    pcall(function()
+        local shared = (getgenv and getgenv()) or _G
+        if shared.CROW_shared then shared = shared.CROW_shared end
+        if shared.CROW_ScriptPersistenceEnabled == false then return end
+        if self.flags and self.flags.ScriptPersistence == false then return end
+
+        local queueOnTeleport = type(queue_on_teleport) == "function" and queue_on_teleport
+        if not queueOnTeleport then return end
+        local lp = players and players.LocalPlayer
+        if not lp or not lp.OnTeleport then return end
+
+        local baseUrl = (shared.CROW_RAW_URL or (self.config and self.config.CROW_RAW_URL) or "https://raw.githubusercontent.com/wrdzy/CROW/main/CrowShooter/"):gsub("/$", "") .. "/"
+        local loaderUrl = baseUrl .. "loader.lua"
+        local escapedUrl = loaderUrl:gsub("\\", "\\\\"):gsub('"', '\\"')
+        local persistenceFolder = "CROW"
+        local persistencePath = persistenceFolder .. "/loader.lua"
+
+        -- Save loader to file so after teleport we can run from readfile (more reliable than HttpGet in new session).
+        if type(makefolder) == "function" and type(writefile) == "function" then
+            pcall(makefolder, persistenceFolder)
+            local content
+            if game and type(game.HttpGet) == "function" then
+                local ok, res = pcall(game.HttpGet, game, loaderUrl)
+                if ok and res and type(res) == "string" and #res > 100 then content = res end
+            end
+            if content then
+                pcall(function() writefile(persistencePath, content) end)
+            end
+        end
+
+        -- Queued script: wait for game load, delay, then run from file (preferred) or HttpGet.
+        local escapedPath = persistencePath:gsub("\\", "\\\\"):gsub('"', '\\"')
+        local code = [[
+(function()
+    if not game or not game.Loaded then return end
+    if not game:IsLoaded() then game.Loaded:Wait() end
+    local w = (task and task.wait) or wait
+    if w then pcall(function() w(2) end) end
+    local ran = false
+    if type(isfile) == "function" and type(readfile) == "function" then
+        local ok, res = pcall(function()
+            if isfile("]] .. escapedPath .. [[") then
+                loadstring(readfile("]] .. escapedPath .. [["))()
+                return true
+            end
+        end)
+        if ok and res then ran = true end
+    end
+    if not ran and game and game.HttpGet then
+        local ok2, err = pcall(function()
+            loadstring(game:HttpGet("]] .. escapedUrl .. [["))()
+        end)
+        if not ok2 and type(warn) == "function" then warn("[CROW] Persistence HttpGet fallback failed: " .. tostring(err)) end
+    end
+end)()
+]]
+        lp.OnTeleport:Connect(function(state)
+            if state == Enum.TeleportState.Started then
+                local g = (getgenv and getgenv()) or _G
+                local sh = g.CROW_shared or g
+                if sh.CROW_ScriptPersistenceEnabled ~= false then
+                    queueOnTeleport(code)
+                end
+            end
+        end)
+    end)
+end
+
 -- Fixed CreateSettingsTab function
 function library:CreateSettingsTab(menu)
     local settingsTab = menu:AddTab('Settings', 999);
@@ -5610,7 +5681,7 @@ function library:CreateSettingsTab(menu)
         library:SetOpen(state)
     end});
 
-    -- Script Persistence: when enabled, CROW re-loads automatically after teleport/server switch (queue_on_teleport in loader.lua)
+    -- Script Persistence: when enabled, CROW re-loads automatically after teleport/server switch (setup in UiInnit).
     mainSection:AddToggle({
         text = 'Script Persistence',
         flag = 'ScriptPersistence',
@@ -5625,6 +5696,7 @@ function library:CreateSettingsTab(menu)
             end
         end
     })
+    library:SetupScriptPersistence()
 
     mainSection:AddButton({text = 'Join Discord', flag = 'joindiscord', confirm = true, callback = function()
         local url = library.config and library.config.DiscordInvite or defaultConfig.DiscordInvite
