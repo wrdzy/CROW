@@ -1704,6 +1704,7 @@ seccharacter:AddColor({
     text = "Character Color",
     tooltip = "Choose a color for your character",
     color = CharacterCustomizer.settings.customColor,
+    flag = "CharacterColor",
     trans = 0,
     callback = function(color)
         CharacterCustomizer.settings.customColor = color
@@ -1813,6 +1814,7 @@ seccharacter:AddColor({
     text = "Glow Color",
     tooltip = "Choose the glow color",
     color = CharacterCustomizer.settings.glowColor,
+    flag = "GlowColor",
     trans = 0,
     callback = function(color)
         CharacterCustomizer.settings.glowColor = color
@@ -1863,6 +1865,7 @@ seccharacter:AddColor({
     text = "Outline Color",
     tooltip = "Choose the outline color",
     color = CharacterCustomizer.settings.outlineColor,
+    flag = "OutlineColor",
     trans = 0,
     callback = function(color)
         CharacterCustomizer.settings.outlineColor = color
