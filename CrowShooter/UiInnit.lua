@@ -5371,7 +5371,15 @@ end
     -- Do not SetOpen(true) here; safe mode runs first (real UiInnit window), then main window loads after YES/NO.
 
     -- Safe mode: single panel (one rect), draggable, sized from actual content. Blocks until YES/NO clicked; returns true/false.
+    -- Clear loader's "Loading CROW..." drawing so safe mode is the only UI visible first.
     function self:ShowSafeModeDialog()
+        pcall(function()
+            local sh = (getgenv and getgenv() or _G).CROW_shared
+            if sh and sh.CROW_loadingDraw then
+                if sh.CROW_loadingDraw.Remove then sh.CROW_loadingDraw:Remove() else sh.CROW_loadingDraw.Visible = false end
+                sh.CROW_loadingDraw = nil
+            end
+        end)
         local cam = workspace.CurrentCamera
         local vw = (cam and cam.ViewportSize and cam.ViewportSize.X) or 800
         local vh = (cam and cam.ViewportSize and cam.ViewportSize.Y) or 600
@@ -5592,6 +5600,10 @@ function library:SetupScriptPersistence()
     if not game:IsLoaded() then game.Loaded:Wait() end
     local w = (task and task.wait) or wait
     if w then pcall(function() w(1) end) end
+    -- Mark that we are loading via persistence (new server) so loader/UiInnit skip safe mode prompt.
+    local env = (getgenv and getgenv() or _G)
+    if not env.CROW_shared then env.CROW_shared = env end
+    env.CROW_shared.CROW_LoadedViaPersistence = true
     local ran = false
     if type(readfile) == "function" then
         local ok, res = pcall(function()
@@ -5872,8 +5884,22 @@ local ok, err = pcall(function()
     dbg("Calling library:init() ...")
     library:init()
     dbg("init() OK. Showing safe mode (UiInnit window) ...")
-    local safeModeResult = library:ShowSafeModeDialog()
-    if _G then _G.CROW_SafeMode = safeModeResult end
+    local safeModeResult
+    local sh = (getgenv and getgenv() or _G).CROW_shared
+    if sh and sh.CROW_SkipSafeMode then
+        safeModeResult = false
+        if _G then _G.CROW_SafeMode = false end
+        -- Clear loading draw when skipping safe mode so only main UI appears
+        pcall(function()
+            if sh.CROW_loadingDraw then
+                if sh.CROW_loadingDraw.Remove then sh.CROW_loadingDraw:Remove() else sh.CROW_loadingDraw.Visible = false end
+                sh.CROW_loadingDraw = nil
+            end
+        end)
+    else
+        safeModeResult = library:ShowSafeModeDialog()
+        if _G then _G.CROW_SafeMode = safeModeResult end
+    end
     library:SetOpen(true)
     library.keyIndicator:SetEnabled(true)
     dbg("Safe mode answered. Calling NewWindow ...")

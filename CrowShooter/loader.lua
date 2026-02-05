@@ -35,15 +35,22 @@ local shared = env.CROW_shared
 -- So injected "local _G = ... CROW_shared or _G" resolves to this table in every script
 shared._G = shared
 
+-- When re-injected via persistence (new server), skip safe mode prompt. Set by teleport script before loader runs.
+if shared.CROW_LoadedViaPersistence then
+    shared.CROW_SkipSafeMode = true
+    shared.CROW_LoadedViaPersistence = nil
+end
+
 -- Wait for game only; UI loads immediately. Player tab activates when character spawns (see PlayerSec).
 pcall(function()
     if not game:IsLoaded() then game.Loaded:Wait() end
 end)
 
--- Loading indicator: show "Loading CROW..." until all scripts are done (removed at end)
+-- Loading indicator: show "Loading CROW..." until all scripts are done (removed before safe mode / at end). Exposed so UiInnit can clear it so safe mode is the only UI first.
 local loadingDraw = nil
 pcall(function()
     loadingDraw = Drawing.new("Text")
+    shared.CROW_loadingDraw = loadingDraw
     loadingDraw.Visible = true
     loadingDraw.Center = true
     loadingDraw.Outline = true
@@ -230,6 +237,7 @@ pcall(function()
         if loadingDraw.Remove then loadingDraw:Remove() else loadingDraw.Visible = false end
         loadingDraw = nil
     end
+    shared.CROW_loadingDraw = nil
 end)
 pcall(function()
     local lib = shared.CROW or shared.library
