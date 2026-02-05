@@ -1,0 +1,2 @@
+# Local AI rules — do not upload to GitHub (read by Cursor every time)
+.cursor/rules/local-ai-rules.mdc
