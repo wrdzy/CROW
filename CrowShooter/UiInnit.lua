@@ -5610,6 +5610,22 @@ function library:CreateSettingsTab(menu)
         library:SetOpen(state)
     end});
 
+    -- Script Persistence: when enabled, CROW re-loads automatically after teleport/server switch (queue_on_teleport in loader.lua)
+    mainSection:AddToggle({
+        text = 'Script Persistence',
+        flag = 'ScriptPersistence',
+        state = true,
+        tooltip = 'When enabled, CROW automatically reloads itself after teleports/server hops (queue_on_teleport).',
+        callback = function(state)
+            local g = (type(getgenv) == "function" and getgenv()) or _G
+            if g and g.CROW_shared then
+                g.CROW_shared.CROW_ScriptPersistenceEnabled = state
+            else
+                _G.CROW_ScriptPersistenceEnabled = state
+            end
+        end
+    })
+
     mainSection:AddButton({text = 'Join Discord', flag = 'joindiscord', confirm = true, callback = function()
         local url = library.config and library.config.DiscordInvite or defaultConfig.DiscordInvite
         if type(request) == "function" then

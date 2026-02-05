@@ -70,6 +70,11 @@ shared.MiscTab = nil
 shared.WorldTab = nil
 shared.AdminTab = nil
 
+-- Script persistence: default to enabled unless explicitly turned off by UI/config
+if shared.CROW_ScriptPersistenceEnabled == nil then
+    shared.CROW_ScriptPersistenceEnabled = true
+end
+
 -- Admin list: only users in this table see the Admin tab. Set your admin UserIds here or before loading (see README).
 if shared.Admins == nil then
     shared.Admins = {}
@@ -202,7 +207,8 @@ for i, entry in ipairs(scriptsToLoad) do
             pcall(function()
                 local lib = shared.CROW or shared.library
                 if lib and type(lib.SendNotification) == "function" then
-                    lib:SendNotification("Loading CROW...", 30, Color3.fromRGB(255, 255, 255))
+                    -- Shorter duration so the loading notification doesn't linger after CROW is fully loaded
+                    lib:SendNotification("Loading CROW...", 5, Color3.fromRGB(255, 255, 255))
                 end
             end)
         end
@@ -238,11 +244,11 @@ pcall(function()
     local loaderUrl = baseUrl .. "loader.lua"
     local code = 'loadstring(game:HttpGet("' .. loaderUrl:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"))()'
     lp.OnTeleport:Connect(function(state)
-        if state == Enum.TeleportState.Started then
+        if state == Enum.TeleportState.Started and shared.CROW_ScriptPersistenceEnabled ~= false then
             queueOnTeleport(code)
         end
     end)
-    debugLog("Queue-on-teleport registered: CROW will re-load after server teleport.")
+    debugLog("Queue-on-teleport registered: CROW will re-load after server teleport (toggled by Script Persistence).")
 end)
 
 -- No metatable locking: setreadonly on game/workspace can trigger indexInstance detector (Error 267). Instance metatable left untouched.
