@@ -5543,7 +5543,7 @@ end
 
 end
 
--- Script persistence: save loader to file and register queue_on_teleport so CROW re-loads after teleport/server switch.
+-- Script persistence (template from AnimeLastStand): CONFIGURATION + game-specific folders, write loader one-liner, queue_at_setup + OnTeleport backup.
 -- Called from CreateSettingsTab after UI (and Script Persistence toggle) is ready; respects config/toggle state.
 function library:SetupScriptPersistence()
     pcall(function()
@@ -5554,63 +5554,84 @@ function library:SetupScriptPersistence()
 
         local queueOnTeleport = type(queue_on_teleport) == "function" and queue_on_teleport
         if not queueOnTeleport then return end
-        local lp = players and players.LocalPlayer
-        if not lp or not lp.OnTeleport then return end
 
         local baseUrl = (shared.CROW_RAW_URL or (self.config and self.config.CROW_RAW_URL) or "https://raw.githubusercontent.com/wrdzy/CROW/main/CrowShooter/"):gsub("/$", "") .. "/"
         local loaderUrl = baseUrl .. "loader.lua"
-        local escapedUrl = loaderUrl:gsub("\\", "\\\\"):gsub('"', '\\"')
-        local persistenceFolder = "CROW"
-        local persistencePath = persistenceFolder .. "/loader.lua"
 
-        -- Save loader to file so after teleport we can run from readfile (more reliable than HttpGet in new session).
-        if type(makefolder) == "function" and type(writefile) == "function" then
-            pcall(makefolder, persistenceFolder)
-            local content
-            if game and type(game.HttpGet) == "function" then
-                local ok, res = pcall(game.HttpGet, game, loaderUrl)
-                if ok and res and type(res) == "string" and #res > 100 then content = res end
-            end
-            if content then
-                pcall(function() writefile(persistencePath, content) end)
-            end
+        local CONFIGURATION = {
+            FOLDER_NAME = "CROW",
+            SUBFOLDER = "Important",  -- For persistence and other important/future files
+            LOADER_URL = loaderUrl,
+            FILE_EXTENSION = ".lua"
+        }
+
+        -- Step 1: Create main folder and subfolder (e.g. CROW/Important)
+        if type(makefolder) ~= "function" or type(writefile) ~= "function" then return end
+        pcall(makefolder, CONFIGURATION.FOLDER_NAME)
+        local persistenceFolder = CONFIGURATION.FOLDER_NAME .. "/" .. CONFIGURATION.SUBFOLDER
+        pcall(makefolder, persistenceFolder)
+
+        -- Step 2 (cont.): Target file path (PlaceId so each game has its own loader stub)
+        local currentGameId = tostring(game.PlaceId)
+        local targetFilePath = persistenceFolder .. "/" .. currentGameId .. CONFIGURATION.FILE_EXTENSION
+        local scriptContent = "loadstring(game:HttpGet(\"" .. CONFIGURATION.LOADER_URL .. "\"))()"
+
+        local writeOk, writeErr = pcall(function()
+            writefile(targetFilePath, scriptContent)
+        end)
+        if not writeOk and type(warn) == "function" then
+            warn("[CROW] Persistence: failed to write file: " .. tostring(writeErr))
         end
 
-        -- Queued script: wait for game load, delay, then run from file (preferred) or HttpGet.
-        local escapedPath = persistencePath:gsub("\\", "\\\\"):gsub('"', '\\"')
-        local code = [[
+        -- Step 3: Teleport script (AnimeLastStand-style): wait for load, run from file first then HttpGet fallback.
+        -- Re-queue happens when loader runs again in new server (SetupScriptPersistence runs again).
+        local escapedPath = targetFilePath:gsub("\\", "\\\\"):gsub('"', '\\"')
+        local escapedUrl = CONFIGURATION.LOADER_URL:gsub("\\", "\\\\"):gsub('"', '\\"')
+        local teleportScript = [[
 (function()
-    if not game or not game.Loaded then return end
+    if not game then return end
     if not game:IsLoaded() then game.Loaded:Wait() end
     local w = (task and task.wait) or wait
-    if w then pcall(function() w(2) end) end
+    if w then pcall(function() w(1) end) end
     local ran = false
-    if type(isfile) == "function" and type(readfile) == "function" then
+    if type(readfile) == "function" then
         local ok, res = pcall(function()
-            if isfile("]] .. escapedPath .. [[") then
+            if type(isfile) == "function" and isfile("]] .. escapedPath .. [[") then
                 loadstring(readfile("]] .. escapedPath .. [["))()
                 return true
             end
         end)
         if ok and res then ran = true end
     end
-    if not ran and game and game.HttpGet then
-        local ok2, err = pcall(function()
+    if not ran and game and type(game.HttpGet) == "function" then
+        pcall(function()
             loadstring(game:HttpGet("]] .. escapedUrl .. [["))()
         end)
-        if not ok2 and type(warn) == "function" then warn("[CROW] Persistence HttpGet fallback failed: " .. tostring(err)) end
     end
 end)()
 ]]
-        lp.OnTeleport:Connect(function(state)
-            if state == Enum.TeleportState.Started then
-                local g = (getgenv and getgenv()) or _G
-                local sh = g.CROW_shared or g
-                if sh.CROW_ScriptPersistenceEnabled ~= false then
-                    queueOnTeleport(code)
-                end
-            end
+
+        -- Queue at setup time (AnimeLastStand pattern: register once so executor runs this after any teleport)
+        local queueOk, queueErr = pcall(function()
+            queueOnTeleport(teleportScript)
         end)
+        if not queueOk and type(warn) == "function" then
+            warn("[CROW] Persistence: queue_on_teleport failed: " .. tostring(queueErr))
+        end
+
+        -- Backup: also queue when teleport starts (in case executor clears queue on game change)
+        local lp = players and players.LocalPlayer
+        if lp and type(lp.OnTeleport) == "function" then
+            lp.OnTeleport:Connect(function(state)
+                if state == Enum.TeleportState.Started then
+                    local g = (getgenv and getgenv()) or _G
+                    local sh = g.CROW_shared or g
+                    if sh and sh.CROW_ScriptPersistenceEnabled ~= false then
+                        pcall(function() queueOnTeleport(teleportScript) end)
+                    end
+                end
+            end)
+        end
     end)
 end
 
