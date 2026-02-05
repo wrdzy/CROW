@@ -41,7 +41,7 @@ local ESPSettings = {
     SkeletonColor = Color3.fromRGB(255, 255, 255),
     TracerColor = Color3.fromRGB(255, 255, 255),
     TracerOrigin = "Bottom",
-    HealthBarWidth = 4,
+    HealthBarWidth = 2,
     HealthBarOffset = 0,
     ESPScale = 1,
     SkeletonThickness = 1,
@@ -351,18 +351,18 @@ local TextSize = seccustomesp:AddSlider({
     end
 })
 
--- Health Bar Width Slider
+-- Health Bar Width Slider (default = min)
 local HealthBarWidth = seccustomesp:AddSlider({
     text = "Health Bar Width",
     min = 2,
     max = 8,
-    default = 4,
+    default = 2,
     increment = 1,
     suffix = "px",
     tooltip = "Adjust the width of health bars",
     flag = "HealthBarWidth",
     callback = function(value)
-        ESPSettings.HealthBarWidth = value or 4
+        ESPSettings.HealthBarWidth = value or 2
     end
 })
 

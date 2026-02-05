@@ -70,9 +70,18 @@ shared.MiscTab = nil
 shared.WorldTab = nil
 shared.AdminTab = nil
 
--- Script persistence: default to enabled unless explicitly turned off by UI/config
+-- Script persistence: read saved state from file (only thing that saves without a config). No file / first run = on.
 if shared.CROW_ScriptPersistenceEnabled == nil then
     shared.CROW_ScriptPersistenceEnabled = true
+    if type(readfile) == "function" then
+        local ok, content = pcall(readfile, "CROW/PersistenceEnabled.txt")
+        if ok and content and type(content) == "string" then
+            local v = content:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+            if v == "false" or v == "0" then
+                shared.CROW_ScriptPersistenceEnabled = false
+            end
+        end
+    end
 end
 
 -- Admin list: only users in this table see the Admin tab. Set your admin UserIds here or before loading (see README).

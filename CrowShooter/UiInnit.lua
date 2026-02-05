@@ -5571,9 +5571,8 @@ function library:SetupScriptPersistence()
         local persistenceFolder = CONFIGURATION.FOLDER_NAME .. "/" .. CONFIGURATION.SUBFOLDER
         pcall(makefolder, persistenceFolder)
 
-        -- Step 2 (cont.): Target file path (PlaceId so each game has its own loader stub)
-        local currentGameId = tostring(game.PlaceId)
-        local targetFilePath = persistenceFolder .. "/" .. currentGameId .. CONFIGURATION.FILE_EXTENSION
+        -- Step 2 (cont.): Target file path (single file for all games)
+        local targetFilePath = persistenceFolder .. "/PersistenceLoader" .. CONFIGURATION.FILE_EXTENSION
         local scriptContent = "loadstring(game:HttpGet(\"" .. CONFIGURATION.LOADER_URL .. "\"))()"
 
         local writeOk, writeErr = pcall(function()
@@ -5702,11 +5701,14 @@ function library:CreateSettingsTab(menu)
         library:SetOpen(state)
     end});
 
-    -- Script Persistence: when enabled, CROW re-loads automatically after teleport/server switch (setup in UiInnit).
+    -- Script Persistence: when enabled, CROW re-loads after teleport. State saved to CROW/PersistenceEnabled.txt (no config).
+    local sharedForPersistence = (getgenv and getgenv()) or _G
+    if sharedForPersistence.CROW_shared then sharedForPersistence = sharedForPersistence.CROW_shared end
+    local persistenceDefault = (sharedForPersistence.CROW_ScriptPersistenceEnabled ~= false)
     mainSection:AddToggle({
         text = 'Script Persistence',
         flag = 'ScriptPersistence',
-        state = true,
+        state = persistenceDefault,
         tooltip = 'When enabled, CROW automatically reloads itself after teleports/server hops (queue_on_teleport).',
         callback = function(state)
             local g = (type(getgenv) == "function" and getgenv()) or _G
@@ -5714,6 +5716,11 @@ function library:CreateSettingsTab(menu)
                 g.CROW_shared.CROW_ScriptPersistenceEnabled = state
             else
                 _G.CROW_ScriptPersistenceEnabled = state
+            end
+            -- Save so next load (any game) respects this without a config
+            if type(makefolder) == "function" and type(writefile) == "function" then
+                pcall(makefolder, "CROW")
+                pcall(writefile, "CROW/PersistenceEnabled.txt", state and "true" or "false")
             end
         end
     })
